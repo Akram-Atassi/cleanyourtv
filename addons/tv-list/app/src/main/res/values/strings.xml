@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">TV list</string>
+    <string name="dream_name">TV list</string>
+    <string name="today_heading">Today</string>
+    <string name="todo_heading">To-do</string>
+    <string name="no_events">Nothing scheduled</string>
+    <string name="no_todos">All clear</string>
+    <string name="loading">Reading your list…</string>
+    <string name="updated">Updated %1$s</string>
+    <string name="offline">Can\'t reach the sheet right now. Showing the last copy; trying again in a minute.</string>
+    <string name="not_shared">The sheet isn\'t shared by link. In Google Sheets: Share, General access, Anyone with the link, Viewer.</string>
+    <string name="no_sheet">No sheet set yet. Run addons/tv-list/setup.sh with your sheet\'s link.</string>
+</resources>

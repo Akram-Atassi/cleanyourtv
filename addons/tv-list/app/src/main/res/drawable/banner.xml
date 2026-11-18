@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 320x180, as Android TV banners are: a checklist on a dark teal field. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp"
+    android:height="180dp"
+    android:viewportWidth="320"
+    android:viewportHeight="180">
+    <path android:fillColor="#FF10242B" android:pathData="M0,0h320v180h-320z" />
+    <path android:fillColor="#FF7FD4C1" android:pathData="M100,48h20v20h-20zM100,80h20v20h-20z" />
+    <path android:fillColor="#FFF2F2F2" android:pathData="M132,54h88v8h-88zM132,86h88v8h-88zM132,118h88v8h-88z" />
+    <path android:strokeColor="#FF7FD4C1" android:strokeWidth="4" android:fillColor="#00000000"
+        android:pathData="M102,114h16v16h-16z" />
+</vector>

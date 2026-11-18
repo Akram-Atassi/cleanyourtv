@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A checklist: two ticked lines and an open one. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path android:fillColor="#FF10242B" android:pathData="M0,0h48v48h-48z" />
+    <path android:fillColor="#FF7FD4C1" android:pathData="M10,12h6v6h-6zM10,21h6v6h-6z" />
+    <path android:fillColor="#FFF2F2F2" android:pathData="M19,14h19v2h-19zM19,23h19v2h-19zM19,32h19v2h-19z" />
+    <path android:strokeColor="#FF7FD4C1" android:strokeWidth="1.5" android:fillColor="#00000000"
+        android:pathData="M10.75,30.75h4.5v4.5h-4.5z" />
+</vector>
