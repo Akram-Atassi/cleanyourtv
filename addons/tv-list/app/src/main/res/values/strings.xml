@@ -10,10 +10,6 @@
     <string name="today_heading">Today</string>
     <string name="todo_heading">To do</string>
     <string name="todo_heading_paged">%1$s    %2$d / %3$d</string>
-    <plurals name="todo_done">
-        <item quantity="one">%d done</item>
-        <item quantity="other">%d done</item>
-    </plurals>
     <string name="no_todos">Nothing left to do.</string>
     <string name="history_heading">On this day</string>
     <string name="event_now">Now</string>

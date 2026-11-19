@@ -202,7 +202,6 @@ final class Scene {
                 ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.END | Gravity.CENTER_VERTICAL));
         right.addView(timeBand, margins(dp(4), 0));
         date = text(18, MUTED, bodyItalic);
-        italicRoom(date);
         date.setGravity(Gravity.END);
         right.addView(date, margins(dp(2), 0));
 
@@ -239,7 +238,6 @@ final class Scene {
         historyHead.addView(label(context.getString(R.string.history_heading)), new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         historyYear = text(24, SAND, displayItalic);
-        italicRoom(historyYear);
         LinearLayout.LayoutParams yp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         yp.setMarginStart(dp(14));
@@ -267,7 +265,6 @@ final class Scene {
         mediaTitle.setGravity(Gravity.END);
         mediaText.addView(mediaTitle, margins(dp(6), 0));
         mediaArtist = text(15, MUTED, bodyItalic);
-        italicRoom(mediaArtist);
         mediaArtist.setGravity(Gravity.END);
         mediaText.addView(mediaArtist, margins(dp(2), 0));
         mediaArt = new android.widget.ImageView(context);
@@ -447,7 +444,7 @@ final class Scene {
         if (!running) return;
         java.time.LocalDateTime now = java.time.LocalDateTime.now();
         clock.setText(arabicTime(now.getHour(), now.getMinute()));
-        date.setText(now.format(DateTimeFormatter.ofPattern("EEEE, MMMM d", Locale.getDefault())));
+        date.setText(italic(now.format(DateTimeFormatter.ofPattern("EEEE, MMMM d", Locale.getDefault()))));
         long msIntoMinute = now.getSecond() * 1000L + now.getNano() / 1_000_000L;
         handler.postDelayed(clockTick, 60_000L - msIntoMinute + 50);
     }
@@ -547,7 +544,7 @@ final class Scene {
             artist = meta.getString(android.media.MediaMetadata.METADATA_KEY_DISPLAY_SUBTITLE);
         }
         mediaTitle.setText(title);
-        mediaArtist.setText(artist == null ? "" : artist);
+        mediaArtist.setText(artist == null ? "" : italic(artist));
         android.graphics.Bitmap art = meta.getBitmap(android.media.MediaMetadata.METADATA_KEY_ALBUM_ART);
         if (art == null) art = meta.getBitmap(android.media.MediaMetadata.METADATA_KEY_ART);
         if (art == null) art = meta.getBitmap(android.media.MediaMetadata.METADATA_KEY_DISPLAY_ICON);
@@ -585,12 +582,12 @@ final class Scene {
         History.Event e = history.get(historyIndex);
         if (advance) {
             historyBox.animate().alpha(0f).setDuration(500).withEndAction(() -> {
-                historyYear.setText(String.valueOf(e.year));
+                historyYear.setText(italic(String.valueOf(e.year)));
                 historyText.setText(e.text);
                 historyBox.animate().alpha(1f).setDuration(700).start();
             }).start();
         } else {
-            historyYear.setText(String.valueOf(e.year));
+            historyYear.setText(italic(String.valueOf(e.year)));
             historyText.setText(e.text);
         }
         if (history.size() > 1) handler.postDelayed(nextHistory, HISTORY_MS);
@@ -620,10 +617,9 @@ final class Scene {
                 line.addView(number, np);
             }
             TextView caption = text(16, MUTED, bodyItalic);
-            italicRoom(caption);
-            caption.setText(days == 0 ? context.getString(R.string.countdown_today, c.name)
+            caption.setText(italic(days == 0 ? context.getString(R.string.countdown_today, c.name)
                     : days == 1 ? context.getString(R.string.countdown_tomorrow, c.name)
-                    : context.getString(R.string.countdown_until, c.name));
+                    : context.getString(R.string.countdown_until, c.name)));
             line.addView(caption, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
             countdowns.addView(line, margins(dp(4), 0));
@@ -707,7 +703,7 @@ final class Scene {
 
     /**
      * Every open task, numbered. One column at full size when they fit; one column a little smaller; two columns;
-     * past that, pages of as many as fit, turning every {@link #PAGE_MS}. Done tasks fold into one line at the bottom.
+     * past that, pages of as many as fit, turning every {@link #PAGE_MS}. Done tasks are simply not shown.
      */
     private void fillTodos() {
         handler.removeCallbacks(nextPage);
@@ -715,10 +711,8 @@ final class Scene {
         TextView title = (TextView) todos.getChildAt(0);
         clear(todos);
         List<Lists.Item> open = new ArrayList<>();
-        int done = 0;
         for (Lists.Item item : Lists.todos(Csv.parse(Config.read(new File(dir, Sheet.TODO_CACHE))))) {
-            if (item.done) done++;
-            else open.add(item);
+            if (!item.done) open.add(item);
         }
         title.setText(R.string.todo_heading);
         todoPages = 1;
@@ -726,7 +720,6 @@ final class Scene {
             TextView none = text(34, MUTED, displayItalic);
             none.setText(R.string.no_todos);
             todos.addView(none, margins(dp(20), 0));
-            footer(done);
             return;
         }
         if (todos.getHeight() == 0) {
@@ -736,7 +729,7 @@ final class Scene {
         }
         int used = 0;
         for (int i = 0; i < 2; i++) used += todos.getChildAt(i).getHeight();
-        int avail = todos.getHeight() - used - dp(8) - (done > 0 ? dp(36) : 0);
+        int avail = todos.getHeight() - used - dp(8);
         int width = todos.getWidth();
 
         int[][] layouts = {{1, 30, 18}, {1, 26, 14}, {1, 22, 10}, {2, 22, 12}, {2, 19, 8}};   // columns, sp, gap dp
@@ -768,7 +761,6 @@ final class Scene {
             handler.postDelayed(nextPage, PAGE_MS);
         }
         todos.addView(grid(shown, from, chosen), margins(dp(8), 0));
-        footer(done);
     }
 
     /** The tasks in {@code layout[0]} balanced columns of {@code layout[1]} sp, {@code layout[2]} dp apart. */
@@ -817,15 +809,6 @@ final class Scene {
         return grid.getMeasuredHeight() <= height;
     }
 
-    /** "2 done" at the bottom of the list. */
-    private void footer(int done) {
-        if (done == 0) return;
-        todos.addView(new View(context), new LinearLayout.LayoutParams(0, 0, 1f));
-        TextView line = text(15, FAINT, sans);
-        line.setText(context.getResources().getQuantityString(R.plurals.todo_done, done, done));
-        todos.addView(line, margins(dp(8), 0));
-    }
-
     /** A section: a small grey label over a hairline rule, added to {@code parent}; content goes under the rule. */
     private LinearLayout section(LinearLayout parent, int heading, LinearLayout.LayoutParams lp, int top) {
         LinearLayout section = new LinearLayout(context);
@@ -849,11 +832,11 @@ final class Scene {
     }
 
     /**
-     * An italic leans past the right edge of its own box, so set flush right its last letter is clipped: give it a
-     * little room there.
+     * An italic leans past the end of its own text, and a TextView draws nothing beyond its text area (padding
+     * included), so set flush right its last letter is clipped. A thin space after it takes the lean.
      */
-    private void italicRoom(TextView t) {
-        t.setPadding(t.getPaddingLeft(), t.getPaddingTop(), dp(5), t.getPaddingBottom());
+    static String italic(CharSequence text) {
+        return text + " ";
     }
 
     /** Small grey capitals, widely spaced: every label on this screen. */
