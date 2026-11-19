@@ -18,7 +18,9 @@ var HIDE_PRIVATE = false;           // true leaves private events off the TV ent
 // Events whose title STARTS with one of these words are left off (classes). Only the first word counts, so a
 // deadline like "Finish HW before tomorrow's lecture" still shows.
 var SKIP_FIRST_WORDS = ['recitation', 'lecture', 'lab'];
-var SKIP_CALENDARS = ['Holidays', 'Birthdays', 'Week Numbers'];   // calendar names (or parts) to leave out
+// Calendar names (or parts, any case) to leave out entirely. Classes and homework reminders live in "GW classes";
+// the Lakers get their own spot on the TV, with the channel, so their calendar would only repeat it.
+var SKIP_CALENDARS = ['Holidays', 'Birthdays', 'Week Numbers', 'Office hours', 'GW classes', 'Lakers'];
 var TAB = 'Today';
 var MAX_EVENTS = 8;                 // the TV shows at most eight
 
