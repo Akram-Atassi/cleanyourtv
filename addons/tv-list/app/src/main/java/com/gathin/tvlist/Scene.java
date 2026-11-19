@@ -51,7 +51,7 @@ final class Scene {
     static final int RULE = 0xFF2C2A27;
     static final int SAND = 0xFFD9BE8F;
     static final int RED = 0xFFE5484D;
-    private static final int PAST = 0, NEXT = 1, UPCOMING = 2;
+    private static final int NOW = 0, NEXT = 1, UPCOMING = 2;
     private static final long RETRY_MS = 60_000L;
     private static final long PAGE_MS = 12_000L;
     private static final int SHIFT_DP = 6;
@@ -83,6 +83,12 @@ final class Scene {
     private final LinearLayout game;
     private final LinearLayout events;
     private final LinearLayout todos;
+    private final LinearLayout historyBox;
+    private final TextView historyYear;
+    private final TextView historyText;
+    private List<History.Event> history = new ArrayList<>();
+    private List<Lists.Item> todayItems = new ArrayList<>();
+    private int historyIndex;
     private final TextView status;
 
     private String sheetId;
@@ -98,6 +104,9 @@ final class Scene {
     private final Runnable tick = this::tick;
     private final Runnable nextPage = () -> page(1);
     private final Runnable relayout = this::fillTodos;
+    private final Runnable nextHistory = () -> showHistoryEvent(true);
+    private static final long HISTORY_MS = 20_000L;
+    private static final int HISTORY_LINES = 3;
 
     Scene(Context context) {
         this.context = context;
@@ -137,6 +146,10 @@ final class Scene {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT), 0);
         todos = section(left, R.string.todo_heading, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f), dp(40));
+        // Whenever the list's room changes (Today appears, an error line goes), fit the tasks to it again.
+        todos.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> {
+            if (b - t != ob - ot || r - l != or - ol) handler.post(relayout);
+        });
 
         // Right, flush right: greeting, birthdays, countdowns, the game, and an error line when there is one.
         LinearLayout right = new LinearLayout(context);
@@ -184,7 +197,32 @@ final class Scene {
 
         game = new LinearLayout(context);
         game.setOrientation(LinearLayout.VERTICAL);
-        right.addView(game, margins(dp(36), 0));
+        right.addView(game, margins(dp(24), 0));
+
+        // At the foot: on this day in history, one event at a time, crossfading.
+        historyBox = new LinearLayout(context);
+        historyBox.setOrientation(LinearLayout.VERTICAL);
+        historyBox.setGravity(Gravity.END);
+        historyBox.setVisibility(View.GONE);
+        right.addView(historyBox, margins(dp(24), 0));
+        LinearLayout historyHead = new LinearLayout(context);
+        historyHead.setOrientation(LinearLayout.HORIZONTAL);
+        historyHead.setGravity(Gravity.END | Gravity.BOTTOM);
+        historyHead.setBaselineAligned(true);
+        historyBox.addView(historyHead, margins(0, 0));
+        historyHead.addView(label(context.getString(R.string.history_heading)), new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        historyYear = text(28, SAND, displayItalic);
+        LinearLayout.LayoutParams yp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        yp.setMarginStart(dp(14));
+        historyHead.addView(historyYear, yp);
+        historyText = text(18, 0xFFC9C3B8, body);
+        historyText.setMaxLines(HISTORY_LINES);
+        historyText.setEllipsize(null);
+        historyText.setGravity(Gravity.END);
+        historyText.setLineSpacing(0, 1.1f);
+        historyBox.addView(historyText, margins(dp(4), 0));
         status = text(14, RED, sans);
         status.setMaxLines(3);
         status.setGravity(Gravity.END);
@@ -213,6 +251,7 @@ final class Scene {
         running = false;
         handler.removeCallbacksAndMessages(null);
         stage.animate().cancel();
+        historyBox.animate().cancel();
         if (executor != null) executor.shutdownNow();
         executor = null;
     }
@@ -244,6 +283,11 @@ final class Scene {
             } catch (IOException | RuntimeException e) {
                 Log.w("TvList", "team: " + e);   // the last copy stays
             }
+            try {
+                History.refresh(dir, LocalDate.now());
+            } catch (IOException | RuntimeException e) {
+                Log.w("TvList", "history: " + e);
+            }
             int result = error;
             handler.post(() -> loaded(result));
         });
@@ -272,6 +316,7 @@ final class Scene {
         int hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
         greeting.setText(greeting(hour));
         sky.set(greeting(hour) == R.string.greeting_morning, System.currentTimeMillis());
+        showToday();        // events leave the minute they end
         showCountdowns();
         showGame();
         handler.postDelayed(tick, 60_000L);
@@ -293,26 +338,84 @@ final class Scene {
         birthdays.setVisibility(born.isEmpty() ? View.GONE : View.VISIBLE);
         birthdays.setText(context.getString(R.string.birthday_line, TextUtils.join(" · ", born)));
 
-        boolean anyEvents = !today.isEmpty();
-        events.setVisibility(anyEvents ? View.VISIBLE : View.GONE);
-        ((LinearLayout.LayoutParams) todos.getLayoutParams()).topMargin = anyEvents ? dp(40) : 0;
-        clear(events);
-        java.time.LocalTime now = java.time.LocalTime.now();
-        boolean nextFound = false;
-        for (Lists.Item item : today) {
-            java.time.LocalTime at = Lists.time(item.detail);
-            int state = UPCOMING;
-            if (at != null && at.isBefore(now.minusMinutes(30))) {
-                state = PAST;
-            } else if (at != null && !nextFound) {
-                state = NEXT;
-                nextFound = true;
-            }
-            events.addView(eventRow(item, state), margins(dp(14), 0));
-        }
+        todayItems = today;
+        showToday();
+        showHistory();
         fillTodos();
         showCountdowns();
         showGame();
+    }
+
+    /**
+     * Today's events as a timeline, checked every minute: an event leaves the list the minute it ends (classes
+     * included), the one on now shows "Now", and the next one's time is in sand. Gone when nothing is left.
+     */
+    private void showToday() {
+        java.time.LocalTime now = java.time.LocalTime.now();
+        clear(events);
+        boolean nextFound = false;
+        int shown = 0;
+        for (Lists.Item item : todayItems) {
+            java.time.LocalTime start = Lists.time(item.detail);
+            java.time.LocalTime end = Lists.time(item.end);
+            // An end before the start runs past midnight: it has not ended today.
+            boolean over = end != null && !(start != null && end.isBefore(start)) && !now.isBefore(end);
+            if (over) continue;
+            int state = UPCOMING;
+            if (start != null && !now.isBefore(start)) {
+                state = NOW;
+            } else if (start != null && !nextFound) {
+                state = NEXT;
+                nextFound = true;
+            }
+            events.addView(eventRow(item, state), margins(dp(10), 0));
+            shown++;
+        }
+        boolean any = shown > 0;
+        events.setVisibility(any ? View.VISIBLE : View.GONE);
+        ((LinearLayout.LayoutParams) todos.getLayoutParams()).topMargin = any ? dp(40) : 0;
+        todos.requestLayout();
+    }
+
+    /** Today's events in history, from the cache; the box hides when there are none (yet). */
+    private void showHistory() {
+        history = History.load(dir, LocalDate.now());
+        // Only events that fit whole in their lines: never one cut short with "…".
+        int width = ((View) historyBox.getParent()).getWidth();
+        if (width > 0) {
+            List<History.Event> whole = new ArrayList<>();
+            for (History.Event e : history) {
+                android.text.StaticLayout layout = android.text.StaticLayout.Builder.obtain(e.text, 0,
+                        e.text.length(), historyText.getPaint(), width).build();
+                if (layout.getLineCount() <= HISTORY_LINES) whole.add(e);
+            }
+            history = whole;
+        } else if (running) {
+            handler.post(this::showHistory);   // not laid out yet
+        }
+        historyBox.setVisibility(history.isEmpty() ? View.GONE : View.VISIBLE);
+        if (history.isEmpty()) return;
+        historyIndex = historyIndex % history.size();
+        showHistoryEvent(false);
+    }
+
+    /** The current event, or the next one with a crossfade; the next turn comes {@link #HISTORY_MS} later. */
+    private void showHistoryEvent(boolean advance) {
+        handler.removeCallbacks(nextHistory);
+        if (!running || history.isEmpty()) return;
+        if (advance) historyIndex = (historyIndex + 1) % history.size();
+        History.Event e = history.get(historyIndex);
+        if (advance) {
+            historyBox.animate().alpha(0f).setDuration(500).withEndAction(() -> {
+                historyYear.setText(String.valueOf(e.year));
+                historyText.setText(e.text);
+                historyBox.animate().alpha(1f).setDuration(700).start();
+            }).start();
+        } else {
+            historyYear.setText(String.valueOf(e.year));
+            historyText.setText(e.text);
+        }
+        if (history.size() > 1) handler.postDelayed(nextHistory, HISTORY_MS);
     }
 
     /** A big serif numeral and what it counts to, flush right; "Today" and "Tomorrow" in words. */
@@ -324,13 +427,13 @@ final class Scene {
                 Csv.parse(Config.read(new File(dir, Sheet.COUNTDOWN_CACHE))), today)) {
             long days = c.daysFrom(today);
             // The count in Arabic numerals, set in Naskh like the greeting above it.
-            TextView number = text(days <= 1 ? 44 : 88, INK, days <= 1 ? displayItalic : naskh);
+            TextView number = text(days <= 1 ? 36 : 60, INK, days <= 1 ? displayItalic : naskh);
             number.setGravity(Gravity.END);
             number.setIncludeFontPadding(false);
             number.setText(days == 0 ? context.getString(R.string.countdown_today_word)
                     : days == 1 ? context.getString(R.string.countdown_tomorrow_word) : arabicDigits(days));
             countdowns.addView(number, margins(first ? 0 : dp(24), 0));
-            TextView caption = text(20, MUTED, bodyItalic);
+            TextView caption = text(18, MUTED, bodyItalic);
             caption.setGravity(Gravity.END);
             caption.setText(days <= 1 ? c.name : context.getString(R.string.countdown_until, c.name));
             countdowns.addView(caption, margins(dp(2), 0));
@@ -359,14 +462,14 @@ final class Scene {
             bar.setBackgroundColor(colour);
             stripe.addView(bar, new LinearLayout.LayoutParams(dp(28), dp(3)));
         }
-        game.addView(stripe, margins(0, dp(14)));
+        game.addView(stripe, margins(0, dp(10)));
 
         TextView label = label(tonight ? context.getString(R.string.game_tonight, Team.TEAM_NAME)
                 : context.getString(R.string.game_next, Team.TEAM_NAME));
         label.setGravity(Gravity.END);
         game.addView(label, margins(0, 0));
 
-        TextView match = text(36, INK, heading);
+        TextView match = text(28, INK, heading);
         match.setGravity(Gravity.END);
         match.setMaxLines(2);
         android.text.SpannableStringBuilder line = new android.text.SpannableStringBuilder();
@@ -381,16 +484,17 @@ final class Scene {
                 : tonight ? time
                 : days == 1 ? context.getString(R.string.game_tomorrow, time)
                 : start.format(DateTimeFormatter.ofPattern("EEEE", Locale.getDefault())) + " " + time;
+        // "10:00 PM · Prime Video": the time in grey, where to watch in sand, on one line.
         TextView whenLine = text(18, MUTED, sans);
         whenLine.setGravity(Gravity.END);
         whenLine.setFontFeatureSettings("tnum");
-        whenLine.setText(when);
+        android.text.SpannableStringBuilder w = new android.text.SpannableStringBuilder(when + "  ·  ");
+        int from = w.length();
+        w.append(g.whereToWatch());
+        w.setSpan(new android.text.style.ForegroundColorSpan(SAND), from, w.length(), 0);
+        w.setSpan(new TypefaceSpanCompat(sansMedium), from, w.length(), 0);
+        whenLine.setText(w);
         game.addView(whenLine, margins(dp(6), 0));
-
-        TextView watch = text(18, SAND, sansMedium);
-        watch.setGravity(Gravity.END);
-        watch.setText(g.whereToWatch());
-        game.addView(watch, margins(dp(2), 0));
     }
 
     /**
@@ -401,12 +505,11 @@ final class Scene {
         LinearLayout row = new LinearLayout(context);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setBaselineAligned(true);
-        TextView time = text(17, state == NEXT ? SAND : state == PAST ? FAINT : MUTED,
-                state == NEXT ? sansMedium : sans);
+        TextView time = text(17, state == UPCOMING ? MUTED : SAND, state == UPCOMING ? sans : sansMedium);
         time.setFontFeatureSettings("tnum");
-        time.setText(item.detail);
+        time.setText(state == NOW ? context.getString(R.string.event_now) : item.detail);
         row.addView(time, new LinearLayout.LayoutParams(dp(104), ViewGroup.LayoutParams.WRAP_CONTENT));
-        TextView title = text(26, state == PAST ? FAINT : INK, body);
+        TextView title = text(22, INK, body);
         title.setMaxLines(2);
         title.setText(item.text);
         row.addView(title, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
@@ -447,7 +550,7 @@ final class Scene {
         int avail = todos.getHeight() - used - dp(8) - (done > 0 ? dp(36) : 0);
         int width = todos.getWidth();
 
-        int[][] layouts = {{1, 30, 18}, {1, 26, 14}, {2, 24, 14}, {2, 21, 10}};   // columns, sp, gap dp
+        int[][] layouts = {{1, 30, 18}, {1, 26, 14}, {1, 22, 10}, {2, 22, 12}, {2, 19, 8}};   // columns, sp, gap dp
         int[] chosen = layouts[layouts.length - 1];
         int perPage = 0;
         for (int[] l : layouts) {

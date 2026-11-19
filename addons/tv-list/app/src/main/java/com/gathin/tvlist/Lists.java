@@ -17,11 +17,18 @@ final class Lists {
         final String text;
         final String detail;
         final boolean done;
+        /** An event's end time as written in the Today tab ("12:00 PM"), or "". */
+        final String end;
 
         Item(String text, String detail, boolean done) {
+            this(text, detail, done, "");
+        }
+
+        Item(String text, String detail, boolean done, String end) {
             this.text = text;
             this.detail = detail;
             this.done = done;
+            this.end = end;
         }
     }
 
@@ -54,7 +61,7 @@ final class Lists {
                 event = time;
                 time = "";
             }
-            events.add(new Item(event, time, false));
+            events.add(new Item(event, time, false, cell(row, 2)));
         }
         return events;
     }

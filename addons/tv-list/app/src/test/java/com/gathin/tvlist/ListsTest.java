@@ -64,4 +64,13 @@ public class ListsTest {
         assertEquals(null, Lists.time("All day"));
         assertEquals(null, Lists.time(""));
     }
+
+    @Test
+    public void eventsCarryTheirEndTime() {
+        List<Lists.Item> events = Lists.events(Csv.parse("Time,Event,Ends\n11:10 AM,Recitation,12:00 PM\nAll day,Trip,\n"));
+        assertEquals("12:00 PM", events.get(0).end);
+        assertEquals("", events.get(1).end);
+        // An old two-column tab still reads, with no end.
+        assertEquals("", Lists.events(Csv.parse("Time,Event\n9:00 AM,Coffee\n")).get(0).end);
+    }
 }

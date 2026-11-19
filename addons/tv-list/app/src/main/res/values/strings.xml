@@ -12,6 +12,8 @@
         <item quantity="other">%d done</item>
     </plurals>
     <string name="no_todos">Nothing left to do.</string>
+    <string name="history_heading">On this day</string>
+    <string name="event_now">Now</string>
     <string name="birthday_line">Birthday · %1$s</string>
     <string name="game_tonight">%1$s tonight</string>
     <string name="game_next">%1$s · next game</string>
