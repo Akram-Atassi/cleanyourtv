@@ -2,6 +2,8 @@
 <resources>
     <string name="app_name">TV list</string>
     <string name="dream_name">TV list</string>
+    <string name="greeting_morning">صباح الخير</string>
+    <string name="greeting_evening">مساء الخير</string>
     <string name="today_heading">Today</string>
     <string name="todo_heading">To-do</string>
     <string name="no_events">Nothing scheduled</string>
