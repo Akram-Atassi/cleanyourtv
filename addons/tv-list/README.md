@@ -36,6 +36,10 @@ One Google Sheet with two tabs, named exactly:
 | `To-do` | Task | Done: a ticked checkbox (`TRUE`), or `yes`, `x`, `done`, `1` or `✓` |
 | `Today` | Time, e.g. `9:00 AM` or `All day` (may be empty) | Event |
 
+An optional third tab, `Countdowns` (column A the name, column B the date as `2026-12-11` or `12/11/2026`, formatted
+as plain text), puts up to three countdowns under the date: "7 days · Chess World Championship", then "Tomorrow" and
+"Today", and a date that has passed drops off by itself.
+
 Row 1 is a header and is skipped. Empty rows are skipped. Format the Time column as plain text (Format > Number >
 Plain text): Google's CSV export gives a column one type, so in a column of times a word like `All day` comes out
 empty. The screen shows at most 12 tasks and 8 events, each cut

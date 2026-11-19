@@ -51,6 +51,7 @@ final class Scene {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final FrameLayout stage;
     private final TextView greeting;
+    private final LinearLayout countdowns;
     private final LinearLayout events;
     private final LinearLayout todos;
     private final TextView status;
@@ -92,7 +93,7 @@ final class Scene {
         page.addView(left, llp);
 
         // Left-aligned with the clock, though Arabic would otherwise start on the right.
-        greeting = text(26, AMBER);
+        greeting = text(28, AMBER);
         greeting.setTextAlignment(View.TEXT_ALIGNMENT_GRAVITY);
         greeting.setGravity(Gravity.LEFT);
         left.addView(greeting, margins(0, 0));
@@ -101,7 +102,7 @@ final class Scene {
         clock.setFormat12Hour("h:mm");
         clock.setFormat24Hour("HH:mm");
         clock.setTextColor(INK);
-        clock.setTextSize(TypedValue.COMPLEX_UNIT_SP, 96);
+        clock.setTextSize(TypedValue.COMPLEX_UNIT_SP, 104);
         clock.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         clock.setLetterSpacing(-0.02f);
         clock.setIncludeFontPadding(false);
@@ -114,15 +115,23 @@ final class Scene {
         date.setTextSize(TypedValue.COMPLEX_UNIT_SP, 22);
         left.addView(date, margins(dp(6), 0));
 
-        events = panel(left, R.string.today_heading, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f), dp(28));
+        countdowns = new LinearLayout(context);
+        countdowns.setOrientation(LinearLayout.VERTICAL);
+        left.addView(countdowns, margins(dp(28), 0));
 
+        // The status line at the bottom of the left column.
+        left.addView(new View(context), new LinearLayout.LayoutParams(0, 0, 1f));
         status = text(13, INK_FAINT);
-        left.addView(status, margins(dp(14), 0));
+        left.addView(status, margins(0, 0));
 
-        // Right: the to-do list, the reason for this screen.
-        todos = panel(page, R.string.todo_heading, new LinearLayout.LayoutParams(
-                0, ViewGroup.LayoutParams.MATCH_PARENT, 0.58f), 0);
+        // Right: today's events at full width, then the to-do list, the reason for this screen.
+        LinearLayout right = new LinearLayout(context);
+        right.setOrientation(LinearLayout.VERTICAL);
+        page.addView(right, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 0.58f));
+        events = panel(right, R.string.today_heading, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT), 0);
+        todos = panel(right, R.string.todo_heading, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f), dp(20));
     }
 
     void start() {
@@ -186,6 +195,7 @@ final class Scene {
         handler.removeCallbacks(tick);
         if (!running) return;
         greeting.setText(greeting(Calendar.getInstance().get(Calendar.HOUR_OF_DAY)));
+        showCountdowns();   // the day may have changed
         if (sheetId != null && !failed) {
             long when = Sheet.cacheTime(dir);
             long now = System.currentTimeMillis();
@@ -207,8 +217,39 @@ final class Scene {
         List<Lists.Item> list = Lists.todos(Csv.parse(Config.read(new File(dir, Sheet.TODO_CACHE))));
         fill(events, today, R.string.no_events, true);
         fill(todos, list, R.string.no_todos, false);
+        showCountdowns();
     }
 
+    /** "7  days · Chess World Championship" under the date, soonest first; nothing when the tab is empty. */
+    private void showCountdowns() {
+        countdowns.removeAllViews();
+        java.time.LocalDate today = java.time.LocalDate.now();
+        for (Lists.Countdown c : Lists.countdowns(
+                Csv.parse(Config.read(new File(dir, Sheet.COUNTDOWN_CACHE))), today)) {
+            long days = c.daysFrom(today);
+            LinearLayout line = new LinearLayout(context);
+            line.setOrientation(LinearLayout.HORIZONTAL);
+            line.setGravity(Gravity.CENTER_VERTICAL);
+            line.setBaselineAligned(false);
+            TextView label = text(19, INK_DIM);
+            if (days <= 1) {
+                label.setTextColor(AMBER);
+                label.setText(context.getString(days == 0 ? R.string.countdown_today : R.string.countdown_tomorrow,
+                        c.name));
+            } else {
+                TextView number = text(30, AMBER);
+                number.setText(String.valueOf(days));
+                number.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+                LinearLayout.LayoutParams np = new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                np.setMarginEnd(dp(10));
+                line.addView(number, np);
+                label.setText(context.getString(R.string.countdown_days, c.name));
+            }
+            line.addView(label, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+            countdowns.addView(line, margins(dp(8), 0));
+        }
+    }
     /** Rows under a heading; the heading (child 0) stays. */
     private void fill(LinearLayout panel, List<Lists.Item> items, int empty, boolean event) {
         panel.removeViews(1, panel.getChildCount() - 1);
@@ -218,7 +259,7 @@ final class Scene {
             panel.addView(none, margins(dp(18), 0));
             return;
         }
-        for (Lists.Item item : items) panel.addView(row(item, event), margins(dp(event ? 14 : 18), 0));
+        for (Lists.Item item : items) panel.addView(row(item, event), margins(dp(event ? 8 : 14), 0));
     }
 
     private View row(Lists.Item item, boolean event) {
@@ -228,15 +269,16 @@ final class Scene {
         // No baseline alignment: it would push the empty checkbox down to the text's baseline and clip it.
         row.setBaselineAligned(false);
         if (event) {
-            TextView time = text(17, AMBER);
+            TextView time = text(15, AMBER);
             time.setText(item.detail);
             time.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
             time.setPadding(0, dp(3), 0, 0);
-            row.addView(time, new LinearLayout.LayoutParams(dp(92), ViewGroup.LayoutParams.WRAP_CONTENT));
+            row.addView(time, new LinearLayout.LayoutParams(dp(78), ViewGroup.LayoutParams.WRAP_CONTENT));
         }
-        TextView label = text(event ? 21 : 25, item.done ? INK_FAINT : INK);
+        TextView label = text(event ? 19 : 23, item.done ? INK_FAINT : INK);
         label.setText(item.text);
-        label.setMaxLines(2);
+        // Events stay on one line so several fit beside the clock; tasks may take two.
+        label.setMaxLines(event ? 1 : 2);
         label.setLineSpacing(0, 1.05f);
         if (!event) row.addView(checkbox(item.done), boxParams(label.getLineHeight()));
         if (item.done) label.setPaintFlags(label.getPaintFlags() | Paint.STRIKE_THRU_TEXT_FLAG);
@@ -267,7 +309,7 @@ final class Scene {
     private LinearLayout.LayoutParams boxParams(int lineHeight) {
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(20), dp(20));
         lp.topMargin = Math.max(0, (lineHeight - dp(20)) / 2);
-        lp.setMarginEnd(dp(20));
+        lp.setMarginEnd(dp(16));
         return lp;
     }
 
@@ -280,7 +322,7 @@ final class Scene {
         card.setStroke(dp(1), 0x1FFFFFFF);
         card.setCornerRadius(dp(24));
         panel.setBackground(card);
-        panel.setPadding(dp(32), dp(26), dp(32), dp(24));
+        panel.setPadding(dp(30), dp(22), dp(30), dp(20));
         lp.topMargin = top;
         parent.addView(panel, lp);
         TextView title = text(14, AMBER);

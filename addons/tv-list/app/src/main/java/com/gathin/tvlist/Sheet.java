@@ -20,6 +20,7 @@ final class Sheet {
     private static final int MAX_BYTES = 512 * 1024;
     static final String TODO_CACHE = "todo.csv";
     static final String TODAY_CACHE = "today.csv";
+    static final String COUNTDOWN_CACHE = "countdowns.csv";
 
     /** The sheet answered with a sign-in page instead of data: it is not shared by link. */
     static final class NotSharedException extends IOException {
@@ -36,6 +37,12 @@ final class Sheet {
         String today = fetch(Config.csvUrl(id, Config.TODAY_TAB));
         Config.write(new File(dir, TODO_CACHE), todo);
         Config.write(new File(dir, TODAY_CACHE), today);
+        // Optional: a sheet without a Countdowns tab still shows its list.
+        try {
+            Config.write(new File(dir, COUNTDOWN_CACHE), fetch(Config.csvUrl(id, Config.COUNTDOWN_TAB)));
+        } catch (IOException ignored) {
+            // Keep the last copy.
+        }
     }
 
     static String fetch(String url) throws IOException {
@@ -78,5 +85,6 @@ final class Sheet {
     static void clearCache(File dir) {
         new File(dir, TODO_CACHE).delete();
         new File(dir, TODAY_CACHE).delete();
+        new File(dir, COUNTDOWN_CACHE).delete();
     }
 }

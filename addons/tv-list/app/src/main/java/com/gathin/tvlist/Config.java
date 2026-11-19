@@ -20,6 +20,7 @@ final class Config {
     static final String SHEET = "sheet.txt";
     static final String TODO_TAB = "To-do";
     static final String TODAY_TAB = "Today";
+    static final String COUNTDOWN_TAB = "Countdowns";
 
     private static final Pattern ID = Pattern.compile("[A-Za-z0-9_-]{20,128}");
     private static final Pattern IN_LINK = Pattern.compile("/spreadsheets/d/([A-Za-z0-9_-]+)");

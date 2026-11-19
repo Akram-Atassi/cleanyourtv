@@ -59,6 +59,58 @@ final class Lists {
         return events;
     }
 
+    static final int MAX_COUNTDOWNS = 3;
+
+    /** One countdown: a name and the day it counts to. */
+    static final class Countdown {
+        final String name;
+        final java.time.LocalDate date;
+
+        Countdown(String name, java.time.LocalDate date) {
+            this.name = name;
+            this.date = date;
+        }
+
+        /** Whole days from {@code today}: 0 is today, 1 tomorrow. */
+        long daysFrom(java.time.LocalDate today) {
+            return java.time.temporal.ChronoUnit.DAYS.between(today, date);
+        }
+    }
+
+    /**
+     * The Countdowns tab (name, date as 2026-12-11 or 12/11/2026): the ones still ahead or today, soonest first, at
+     * most {@link #MAX_COUNTDOWNS}. Rows without a readable date are skipped.
+     */
+    static List<Countdown> countdowns(List<List<String>> rows, java.time.LocalDate today) {
+        List<Countdown> list = new ArrayList<>();
+        for (List<String> row : rows) {
+            String name = cell(row, 0);
+            java.time.LocalDate date = date(cell(row, 1));
+            if (name.isEmpty() || date == null || date.isBefore(today)) continue;
+            list.add(new Countdown(name, date));
+        }
+        list.sort((a, b) -> a.date.compareTo(b.date));
+        return list.size() > MAX_COUNTDOWNS ? new ArrayList<>(list.subList(0, MAX_COUNTDOWNS)) : list;
+    }
+
+    /** 2026-12-11, or 12/11/2026 as US sheets write it; null for anything else. */
+    static java.time.LocalDate date(String text) {
+        String t = text.trim();
+        try {
+            if (t.matches("\\d{4}-\\d{1,2}-\\d{1,2}")) {
+                String[] p = t.split("-");
+                return java.time.LocalDate.of(Integer.parseInt(p[0]), Integer.parseInt(p[1]), Integer.parseInt(p[2]));
+            }
+            if (t.matches("\\d{1,2}/\\d{1,2}/\\d{4}")) {
+                String[] p = t.split("/");
+                return java.time.LocalDate.of(Integer.parseInt(p[2]), Integer.parseInt(p[0]), Integer.parseInt(p[1]));
+            }
+        } catch (java.time.DateTimeException e) {
+            return null;
+        }
+        return null;
+    }
+
     /** A Done cell that counts as done: a ticked checkbox (TRUE) or yes, x, done, 1, ✓. */
     static boolean isDone(String value) {
         String v = value.trim().toLowerCase(Locale.ROOT);
