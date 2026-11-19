@@ -15,12 +15,16 @@
 var PRIVATE_WORDS = ['doctor', 'dentist', 'therapy', 'therapist', 'clinic', 'health', 'medical', 'appointment',
                      'pharmacy', 'counsel', 'hospital', 'vaccine', 'shot', 'physical', 'psych'];
 var HIDE_PRIVATE = false;           // true leaves private events off the TV entirely
-// Events whose title STARTS with one of these words are left off (classes). Only the first word counts, so a
-// deadline like "Finish HW before tomorrow's lecture" still shows.
-var SKIP_FIRST_WORDS = ['recitation', 'lecture', 'lab'];
-// Calendar names (or parts, any case) to leave out entirely. Classes and homework reminders live in "GW classes";
-// the Lakers get their own spot on the TV, with the channel, so their calendar would only repeat it.
-var SKIP_CALENDARS = ['Holidays', 'Week Numbers', 'Office hours', 'GW classes', 'Lakers'];
+// Events whose title STARTS with one of these words are left off. Only the first word counts, so "Lab 3" matches
+// and "Labor Day" does not. Empty: classes are shown (and leave the TV when they end).
+var SKIP_FIRST_WORDS = [];
+// Calendar names (or parts, any case) to leave out entirely. The Lakers get their own spot on the TV, with the
+// channel, so their calendar would only repeat it.
+var SKIP_CALENDARS = ['Holidays', 'Week Numbers', 'Office hours', 'Lakers'];
+// Calendars that hold classes and also one-minute homework reminders (at 11:59 PM): from these, only events lasting
+// at least MIN_CLASS_MINUTES are written, which keeps the classes and drops the reminders.
+var CLASS_CALENDARS = ['GW classes'];
+var MIN_CLASS_MINUTES = 20;
 var TAB = 'Today';
 var MAX_EVENTS = 8;                 // the TV shows at most eight
 
@@ -42,26 +46,34 @@ function fillToday() {
   start.setHours(0, 0, 0, 0);
   var end = new Date(start.getTime() + 24 * 3600 * 1000);
 
+  var now = new Date();
   var rows = [];
   CalendarApp.getAllCalendars().forEach(function (cal) {
+    var classes = matches(cal.getName(), CLASS_CALENDARS);
     if (cal.isHidden() || !cal.isSelected() || matches(cal.getName(), SKIP_CALENDARS)) return;
     cal.getEvents(start, end).forEach(function (ev) {
       if (declined(ev)) return;
       var title = ev.getTitle() || '(No title)';
       // Birthdays get "Birthday" as their time: the TV shows them in red under the date, not in the list.
       if (isBirthday(cal, ev, title)) {
-        rows.push({ sort: -1, time: 'Birthday', title: title.replace(/[’']s birthday$/i, '').replace(/^birthday:?\s*/i, '') });
+        rows.push({ sort: -1, time: 'Birthday', ends: '',
+          title: title.replace(/[’']s birthday$/i, '').replace(/^birthday:?\s*/i, '') });
         return;
       }
       if (startsWithWord(title, SKIP_FIRST_WORDS)) return;
+      var allDay = ev.isAllDayEvent();
+      var minutes = (ev.getEndTime().getTime() - ev.getStartTime().getTime()) / 60000;
+      if (classes && !allDay && minutes < MIN_CLASS_MINUTES) return;   // a homework reminder, not a class
+      if (!allDay && ev.getEndTime().getTime() <= now.getTime()) return;   // already over
       var isPrivate = ev.getVisibility() === CalendarApp.Visibility.PRIVATE
           || matches(title, PRIVATE_WORDS) || matches(cal.getName(), PRIVATE_WORDS);
       if (isPrivate && HIDE_PRIVATE) return;
-      var allDay = ev.isAllDayEvent();
       rows.push({
         sort: allDay ? 0 : ev.getStartTime().getTime(),
         time: allDay ? 'All day' : Utilities.formatDate(ev.getStartTime(), tz, 'h:mm a'),
-        title: isPrivate ? 'Private appointment' : title
+        title: isPrivate ? 'Private appointment' : title,
+        // When it ends, so the TV can take it off the list that minute.
+        ends: allDay ? '' : Utilities.formatDate(ev.getEndTime(), tz, 'h:mm a')
       });
     });
   });
@@ -71,13 +83,13 @@ function fillToday() {
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(TAB);
   if (!sheet) throw new Error('No tab named "' + TAB + '" in this sheet');
   var last = Math.max(sheet.getLastRow(), 2);
-  sheet.getRange(2, 1, last - 1, 2).clearContent();
-  sheet.getRange(1, 1, 1, 2).setValues([['Time', 'Event']]);
+  sheet.getRange(2, 1, last - 1, 3).clearContent();
+  sheet.getRange(1, 1, 1, 3).setValues([['Time', 'Event', 'Ends']]);
   if (rows.length) {
-    var range = sheet.getRange(2, 1, rows.length, 2);
+    var range = sheet.getRange(2, 1, rows.length, 3);
     // Plain text, so the TV reads "9:00 AM" and "All day" as written (see the add-on's README).
     range.setNumberFormat('@');
-    range.setValues(rows.map(function (r) { return [r.time, r.title]; }));
+    range.setValues(rows.map(function (r) { return [r.time, r.title, r.ends]; }));
   }
 }
 
