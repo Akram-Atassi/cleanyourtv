@@ -20,7 +20,7 @@ var HIDE_PRIVATE = false;           // true leaves private events off the TV ent
 var SKIP_FIRST_WORDS = ['recitation', 'lecture', 'lab'];
 // Calendar names (or parts, any case) to leave out entirely. Classes and homework reminders live in "GW classes";
 // the Lakers get their own spot on the TV, with the channel, so their calendar would only repeat it.
-var SKIP_CALENDARS = ['Holidays', 'Birthdays', 'Week Numbers', 'Office hours', 'GW classes', 'Lakers'];
+var SKIP_CALENDARS = ['Holidays', 'Week Numbers', 'Office hours', 'GW classes', 'Lakers'];
 var TAB = 'Today';
 var MAX_EVENTS = 8;                 // the TV shows at most eight
 
@@ -48,6 +48,11 @@ function fillToday() {
     cal.getEvents(start, end).forEach(function (ev) {
       if (declined(ev)) return;
       var title = ev.getTitle() || '(No title)';
+      // Birthdays get "Birthday" as their time: the TV shows them in red under the date, not in the list.
+      if (isBirthday(cal, ev, title)) {
+        rows.push({ sort: -1, time: 'Birthday', title: title.replace(/[’']s birthday$/i, '').replace(/^birthday:?\s*/i, '') });
+        return;
+      }
       if (startsWithWord(title, SKIP_FIRST_WORDS)) return;
       var isPrivate = ev.getVisibility() === CalendarApp.Visibility.PRIVATE
           || matches(title, PRIVATE_WORDS) || matches(cal.getName(), PRIVATE_WORDS);
@@ -74,6 +79,17 @@ function fillToday() {
     range.setNumberFormat('@');
     range.setValues(rows.map(function (r) { return [r.time, r.title]; }));
   }
+}
+
+/** A contact's birthday (Google's Birthdays calendar or event type), or an all-day event called "... birthday". */
+function isBirthday(cal, ev, title) {
+  if (/birthday/i.test(cal.getName())) return true;
+  try {
+    if (String(ev.getEventType()) === String(CalendarApp.EventType.BIRTHDAY)) return true;
+  } catch (e) {
+    // Older Apps Script runtimes have no event types.
+  }
+  return ev.isAllDayEvent() && /birthday/i.test(title);
 }
 
 /** True when you declined the event: it stays in Calendar but is not part of your day. */
