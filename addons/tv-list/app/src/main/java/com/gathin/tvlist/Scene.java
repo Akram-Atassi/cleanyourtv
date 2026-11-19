@@ -323,11 +323,12 @@ final class Scene {
         for (Lists.Countdown c : Lists.countdowns(
                 Csv.parse(Config.read(new File(dir, Sheet.COUNTDOWN_CACHE))), today)) {
             long days = c.daysFrom(today);
-            TextView number = text(days <= 1 ? 44 : 88, INK, days <= 1 ? displayItalic : display);
+            // The count in Arabic numerals, set in Naskh like the greeting above it.
+            TextView number = text(days <= 1 ? 44 : 88, INK, days <= 1 ? displayItalic : naskh);
             number.setGravity(Gravity.END);
             number.setIncludeFontPadding(false);
             number.setText(days == 0 ? context.getString(R.string.countdown_today_word)
-                    : days == 1 ? context.getString(R.string.countdown_tomorrow_word) : String.valueOf(days));
+                    : days == 1 ? context.getString(R.string.countdown_tomorrow_word) : arabicDigits(days));
             countdowns.addView(number, margins(first ? 0 : dp(24), 0));
             TextView caption = text(20, MUTED, bodyItalic);
             caption.setGravity(Gravity.END);
@@ -583,6 +584,17 @@ final class Scene {
         t.setEllipsize(TextUtils.TruncateAt.END);
         t.setMaxLines(1);
         return t;
+    }
+
+    /** 23 as ٢٣: the Arabic-Indic digits. */
+    static String arabicDigits(long n) {
+        String western = String.valueOf(n);
+        StringBuilder arabic = new StringBuilder(western.length());
+        for (int i = 0; i < western.length(); i++) {
+            char c = western.charAt(i);
+            arabic.append(c >= '0' && c <= '9' ? (char) ('٠' + (c - '0')) : c);
+        }
+        return arabic.toString();
     }
 
     /** A tile of fine film grain: specks of light and dark at a few percent, repeated across the screen. */
