@@ -116,10 +116,9 @@ final class Scene {
             status.setText(R.string.no_sheet);
             return;
         }
+        // The last copy at once, then the sheet itself: every start reads it, so an edit shows the next time.
         showLists();
-        long age = System.currentTimeMillis() - Sheet.cacheTime(dir);
-        if (age >= Sheet.REFRESH_MS || age < 0) refresh();
-        else handler.postDelayed(refresh, Sheet.REFRESH_MS - age);
+        refresh();
         tick();
     }
 
@@ -170,10 +169,11 @@ final class Scene {
         if (!running || sheetId == null) return;
         if (!failed) {
             long when = Sheet.cacheTime(dir);
-            status.setText(when == 0 ? context.getString(R.string.loading)
-                    : context.getString(R.string.updated, DateUtils.getRelativeTimeSpanString(
-                            Math.min(when, System.currentTimeMillis()), System.currentTimeMillis(),
-                            DateUtils.MINUTE_IN_MILLIS)));
+            long now = System.currentTimeMillis();
+            if (when == 0) status.setText(R.string.loading);
+            else if (now - when < 60_000L) status.setText(R.string.updated_now);
+            else status.setText(context.getString(R.string.updated, DateUtils.getRelativeTimeSpanString(
+                    Math.min(when, now), now, DateUtils.MINUTE_IN_MILLIS)));
         }
         handler.postDelayed(tick, 60_000L);
     }

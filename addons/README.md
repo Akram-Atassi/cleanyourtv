@@ -32,7 +32,7 @@ the core bigger or change how it behaves. You install an add-on only if you want
 | [World Clock](world-clock/) | One to six offline clocks with dates, UTC offsets and day differences; city search and D-pad controls | [@SaviorOneZero](https://github.com/SaviorOneZero) | Samsung C71KW-200 / AT&T Osprey (Android TV 11) | None | <img src="world-clock/screenshot.jpg" width="240" alt="World Clock on a TV"> |
 | [Flock](flock/) | An interactive flocking simulation using separation, alignment and cohesion, controlled with the TV remote | CleanYourTV contributors | TCL 32S5K (Android TV 14) | None | <img src="flock/screenshot.jpg" width="240" alt="Flock on TCL Android TV"> |
 | [News screensaver](news-screensaver/) | Headlines from your own RSS and Atom feeds as the TV's screensaver and as a card, one at a time with source, age, a QR code to the article and Left/Right paging; feeds (with names), seconds per headline and idle time are set with `setup.sh` or on the TV | [@modist](https://github.com/modist) | Philips 2021/22 UHD Android TV (Android 11) | `INTERNET` | <img src="news-screensaver/screenshot.jpg" width="240" alt="News screensaver on a TV"> |
-| [TV list](tv-list/) | Your to-do list and today's events from a Google Sheet, as the TV's screensaver and as a card: a large clock, Today on the left, To-do on the right with done tasks struck through; refreshed every five minutes, so an assistant that edits the sheet updates the TV | [Akram-Atassi](https://github.com/Akram-Atassi) | Not yet (built for Google TV Streamer, Google TV 14) | `INTERNET` | Wanted |
+| [TV list](tv-list/) | Your to-do list and today's events from a Google Sheet, as the TV's screensaver and as a card: a large clock, Today on the left, To-do on the right with done tasks struck through; re-read on every open and each minute, and a remote button can flip between it and the TV's own screensaver, so an assistant that edits the sheet updates the TV | [Akram-Atassi](https://github.com/Akram-Atassi) | onn. Full HD (XNA), Google TV, Android 12 | `INTERNET` | Wanted |
 | [Digital Rain](digital-rain/) | A Matrix-style screensaver: mirrored katakana and digits falling in green trails with bright heads, drawn on the TV with no network; the card starts it at once | [@dennis-oleary](https://github.com/dennis-oleary) | NVIDIA SHIELD Android TV Pro 2019 (Android TV 11) | None | <img src="digital-rain/screenshot.jpg" width="240" alt="Digital Rain on a TV"> |
 
 A widget, an info tile, a storage or smart-home card: if it can live as its own small app, it can live
@@ -112,7 +112,7 @@ TV_HOST=<tv ip> tools/venv/bin/python -I tools/manage.py install weather
   apply: no telemetry without an opt-in, no ads, your own art.
 - **Tested on a real TV.** Say which one in the README and in the table above.
 - **A screenshot.** `addons/<name>/screenshot.jpg`: the add-on on a real TV, its card in the grid or
-  its own screen, as a JPEG, 16:9 (1280×720 is plenty) and under 300 KB, shown in the table's
+  its own screen, as a JPEG, 16:9 (1280Ã—720 is plenty) and under 300 KB, shown in the table's
   Screenshot column. It is what people see first here and on [cleanyour.tv/addons](https://cleanyour.tv/addons).
   Take it with `tools/tv.py --screenshot shot.png` (or `adb exec-out screencap -p > shot.png`), then
   `sips -s format jpeg -s formatOptions 85 -z 720 1280 shot.png --out screenshot.jpg` on a Mac.

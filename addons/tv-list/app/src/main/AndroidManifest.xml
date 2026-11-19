@@ -30,6 +30,8 @@
         <activity
             android:name=".TvListActivity"
             android:exported="true"
+            android:launchMode="singleTask"
+            android:excludeFromRecents="true"
             android:theme="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

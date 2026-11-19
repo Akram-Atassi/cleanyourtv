@@ -14,7 +14,8 @@ import java.util.Locale;
  * to show at once and while the network is down. Nothing is ever sent but the request for the sheet.
  */
 final class Sheet {
-    static final long REFRESH_MS = 5 * 60_000L;
+    /** While the list is on screen; it is also read every time it opens. */
+    static final long REFRESH_MS = 60_000L;
     private static final int TIMEOUT_MS = 10_000;
     private static final int MAX_BYTES = 512 * 1024;
     static final String TODO_CACHE = "todo.csv";

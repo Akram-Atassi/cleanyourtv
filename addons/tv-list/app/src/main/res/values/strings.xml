@@ -8,6 +8,7 @@
     <string name="no_todos">All clear</string>
     <string name="loading">Reading your list…</string>
     <string name="updated">Updated %1$s</string>
+    <string name="updated_now">Updated just now</string>
     <string name="offline">Can\'t reach the sheet right now. Showing the last copy; trying again in a minute.</string>
     <string name="not_shared">The sheet isn\'t shared by link. In Google Sheets: Share, General access, Anyone with the link, Viewer.</string>
     <string name="no_sheet">No sheet set yet. Run addons/tv-list/setup.sh with your sheet\'s link.</string>

@@ -2,13 +2,28 @@
 
 A system screensaver (Android's "Daydream") and a Home card that show your to-do list and today's events from a
 Google Sheet: a large clock and the date at the top, **Today** on the left (time and event) and **To-do** on the
-right, with open tasks first and done ones struck through at the end. The sheet is read when the screen starts and
-every five minutes while it shows, so a change made from your phone, or by an assistant that can edit the sheet,
-reaches the TV within minutes. The last good copy shows at once, and stays up while the network is down. Against
+right, with open tasks first and done ones struck through at the end. The sheet is read every time the screen opens
+and every minute while it shows, so a change made from your phone, or by an assistant that can edit the sheet, is
+on the TV the next time you look. The last good copy shows at once, and stays up while the network is down. Against
 burn-in the whole picture drifts 6 dp round a small circle, one slow step every two minutes.
 
 Any key wakes the TV back to where it was. On cleanyourtv's Home it is also a module card, **TV list**: OK shows the
 list at once, and any key goes back to Home.
+
+### One button between the list and your own screensaver
+
+You can keep the TV's own screensaver (Google's Ambient mode, say) and put the list on a remote button instead. Map
+the button to launch **TV list**: on Google TV, Settings > Remotes & Accessories > the star-button shortcut >
+Favorite app > TV list (Button Mapper, or the launcher's `app_keys`, work too). Then the button flips between the two:
+
+| On screen | Press the button |
+|---|---|
+| The screensaver, Home or an app | The list fades in, re-reading the sheet |
+| The list | The list fades out and the TV's own screensaver starts |
+
+Any other key leaves the list. Opened over the screensaver, the list wakes the TV out of it rather than opening
+behind it. In this mode `setup.sh` is not needed for the screensaver, only to set the sheet; leave the TV's
+screensaver as it is.
 
 Package `com.gathin.tvlist`. You see it as **TV list** in the TV's screensaver settings.
 
@@ -21,7 +36,9 @@ One Google Sheet with two tabs, named exactly:
 | `To-do` | Task | Done: a ticked checkbox (`TRUE`), or `yes`, `x`, `done`, `1` or `✓` |
 | `Today` | Time, e.g. `9:00 AM` or `All day` (may be empty) | Event |
 
-Row 1 is a header and is skipped. Empty rows are skipped. The screen shows at most 12 tasks and 8 events, each cut
+Row 1 is a header and is skipped. Empty rows are skipped. Format the Time column as plain text (Format > Number >
+Plain text): Google's CSV export gives a column one type, so in a column of times a word like `All day` comes out
+empty. The screen shows at most 12 tasks and 8 events, each cut
 to one or two lines.
 
 **Share it so the TV can read it:** in Google Sheets, Share > General access > **Anyone with the link**, role
@@ -77,5 +94,6 @@ id and the last copy of the two tabs stay in the app's own storage (backups off)
 
 ## Tested on
 
-Not yet on a real TV. Built for a Google TV Streamer (2024), Google TV 14. The CSV, sheet-link and list logic is
-covered by the unit tests in `app/src/test`.
+onn. Full HD Streaming Device (XNA), Google TV, Android 12, build `SGZ3.231226.096.A1.12865554`: the list from a
+link-shared sheet, the star-button toggle with Google's Ambient mode, and the fades, with the real remote. The CSV,
+sheet-link and list logic is covered by the unit tests in `app/src/test`.
