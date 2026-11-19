@@ -15,6 +15,9 @@
 var PRIVATE_WORDS = ['doctor', 'dentist', 'therapy', 'therapist', 'clinic', 'health', 'medical', 'appointment',
                      'pharmacy', 'counsel', 'hospital', 'vaccine', 'shot', 'physical', 'psych'];
 var HIDE_PRIVATE = false;           // true leaves private events off the TV entirely
+// Events whose title STARTS with one of these words are left off (classes). Only the first word counts, so a
+// deadline like "Finish HW before tomorrow's lecture" still shows.
+var SKIP_FIRST_WORDS = ['recitation', 'lecture', 'lab'];
 var SKIP_CALENDARS = ['Holidays', 'Birthdays', 'Week Numbers'];   // calendar names (or parts) to leave out
 var TAB = 'Today';
 var MAX_EVENTS = 8;                 // the TV shows at most eight
@@ -43,6 +46,7 @@ function fillToday() {
     cal.getEvents(start, end).forEach(function (ev) {
       if (declined(ev)) return;
       var title = ev.getTitle() || '(No title)';
+      if (startsWithWord(title, SKIP_FIRST_WORDS)) return;
       var isPrivate = ev.getVisibility() === CalendarApp.Visibility.PRIVATE
           || matches(title, PRIVATE_WORDS) || matches(cal.getName(), PRIVATE_WORDS);
       if (isPrivate && HIDE_PRIVATE) return;
@@ -77,6 +81,12 @@ function declined(ev) {
   } catch (e) {
     return false;
   }
+}
+
+/** True when the title's first word is one of {@code words} ("Lab 3" yes, "Labor Day" no), any case. */
+function startsWithWord(title, words) {
+  var first = String(title).trim().split(/[^A-Za-z]+/)[0].toLowerCase();
+  return words.some(function (w) { return first === String(w).toLowerCase(); });
 }
 
 function matches(text, words) {
