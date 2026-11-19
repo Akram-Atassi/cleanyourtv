@@ -16,7 +16,9 @@ TEXT = {".gradle", ".kts", ".java", ".kt", ".xml", ".properties", ".sh", ".ps1",
 
 # Add-ons merged before screenshots were required. This list only shrinks: once one gets a
 # screenshot.jpg, take it off here.
-SCREENSHOT_WANTED = set()
+# tv-list is this fork's own add-on, not contributed upstream: its real screens show a private to-do
+# list and calendar, so it has no screenshot.
+SCREENSHOT_WANTED = {"tv-list"}
 
 
 def addon_dirs():
