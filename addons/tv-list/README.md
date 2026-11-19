@@ -46,6 +46,16 @@ to one or two lines.
 the list too, so keep anything private off it. A school or work Google account may not allow link sharing; then make
 the sheet in a personal Google account. If the sheet is not shared, the screen says so at the bottom.
 
+### Today from your calendar, by itself
+
+[`calendar.gs`](calendar.gs) is a Google Apps Script that fills the `Today` tab from your Google Calendar every 15
+minutes, on Google's servers, free: nothing to run on a computer and no assistant to ask. Open the sheet,
+Extensions > Apps Script, paste the file in place of what is there, save, choose `setup` in the function menu and
+press Run, then allow access when Google asks. Because the sheet is readable by link, the script writes only times
+and titles, and an event marked Private, or whose title or calendar matches its `PRIVATE_WORDS` list (doctor,
+dentist, health and the like), shows as "Private appointment" (or not at all with `HIDE_PRIVATE = true`). Run
+`removeTriggers` to stop it.
+
 ### Keeping it up to date with an assistant
 
 Any assistant that can edit your Google Sheets can keep the list: tell it the sheet's name and the layout above, and
