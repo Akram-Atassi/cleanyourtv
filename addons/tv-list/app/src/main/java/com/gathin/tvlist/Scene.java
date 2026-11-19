@@ -180,25 +180,27 @@ final class Scene {
         FrameLayout top = new FrameLayout(context);
         top.setClipChildren(false);
         sky = new SkyMark(context);
-        top.addView(sky, new FrameLayout.LayoutParams(dp(92), dp(92), Gravity.START | Gravity.CENTER_VERTICAL));
-        greeting = text(42, INK, naskh);
+        greeting = text(36, INK, naskh);
         greeting.setTextDirection(View.TEXT_DIRECTION_RTL);
         greeting.setIncludeFontPadding(false);
         greeting.setEllipsize(null);   // never cut the greeting short
         top.addView(greeting, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.END | Gravity.CENTER_VERTICAL));
-        LinearLayout.LayoutParams tp = margins(-dp(30), 0);   // the glow may reach into the margin above
+        LinearLayout.LayoutParams tp = margins(0, 0);
         right.addView(top, tp);
 
         // The time in Arabic numerals, with ص or م, and the date under it in italic.
+        // Tonight's moon (or the sun) rides beside the clock, at the left of the same band, its glow behind.
+        FrameLayout timeBand = new FrameLayout(context);
+        timeBand.setClipChildren(false);
+        timeBand.addView(sky, new FrameLayout.LayoutParams(dp(92), dp(92), Gravity.START | Gravity.CENTER_VERTICAL));
         clock = text(46, INK, naskh);
         clock.setTextDirection(View.TEXT_DIRECTION_RTL);
-        // Right edge whatever the text's direction (END would mean left for Arabic).
-        clock.setGravity(Gravity.RIGHT);
-        clock.setTextAlignment(View.TEXT_ALIGNMENT_GRAVITY);
         clock.setIncludeFontPadding(false);
         clock.setEllipsize(null);
-        right.addView(clock, margins(dp(2), 0));
+        timeBand.addView(clock, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.END | Gravity.CENTER_VERTICAL));
+        right.addView(timeBand, margins(dp(4), 0));
         date = text(18, MUTED, bodyItalic);
         date.setGravity(Gravity.END);
         right.addView(date, margins(dp(2), 0));
@@ -372,7 +374,8 @@ final class Scene {
         handler.removeCallbacks(tick);
         if (!running) return;
         int hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
-        greeting.setText(greeting(hour));
+        greeting.setText(context.getString(R.string.greeting_with_name, context.getString(greeting(hour)),
+                context.getString(R.string.owner_name)));
         sky.set(greeting(hour) == R.string.greeting_morning, System.currentTimeMillis());
         showToday();        // events leave the minute they end
         showCountdowns();
@@ -435,7 +438,7 @@ final class Scene {
         todos.requestLayout();
     }
 
-    /** The time as ٩:١٥ م, the date in words; again at the turn of the next minute. */
+    /** The time as ٩:١٥, the date in words; again at the turn of the next minute. */
     private void clockTick() {
         handler.removeCallbacks(clockTick);
         if (!running) return;
@@ -446,11 +449,10 @@ final class Scene {
         handler.postDelayed(clockTick, 60_000L - msIntoMinute + 50);
     }
 
-    /** 21:05 as ٩:٠٥ م: a twelve-hour clock in Arabic-Indic digits, ص before noon and م after. */
+    /** 21:05 as ٩:٠٥: a twelve-hour clock in Arabic-Indic digits. */
     static String arabicTime(int hour, int minute) {
         int h = hour % 12 == 0 ? 12 : hour % 12;
-        return arabicDigits(h) + ":" + arabicDigits(minute / 10) + arabicDigits(minute % 10) + " "
-                + (hour < 12 ? "ص" : "م");
+        return arabicDigits(h) + ":" + arabicDigits(minute / 10) + arabicDigits(minute % 10);
     }
 
     private final android.media.session.MediaSessionManager.OnActiveSessionsChangedListener sessionsChanged =
@@ -591,26 +593,36 @@ final class Scene {
         if (history.size() > 1) handler.postDelayed(nextHistory, HISTORY_MS);
     }
 
-    /** A big serif numeral and what it counts to, flush right; "Today" and "Tomorrow" in words. */
+    /**
+     * One line per countdown, flush right: "٢٣  days until Finals start", the number small and in sand so it never
+     * reads as the clock above it; "Today · Finals start" and "Tomorrow · …" in words.
+     */
     private void showCountdowns() {
         countdowns.removeAllViews();
         LocalDate today = LocalDate.now();
-        boolean first = true;
         for (Lists.Countdown c : Lists.countdowns(
                 Csv.parse(Config.read(new File(dir, Sheet.COUNTDOWN_CACHE))), today)) {
             long days = c.daysFrom(today);
-            // The count in Arabic numerals, set in Naskh like the greeting above it.
-            TextView number = text(days <= 1 ? 28 : 44, INK, days <= 1 ? displayItalic : naskh);
-            number.setGravity(Gravity.END);
-            number.setIncludeFontPadding(false);
-            number.setText(days == 0 ? context.getString(R.string.countdown_today_word)
-                    : days == 1 ? context.getString(R.string.countdown_tomorrow_word) : arabicDigits(days));
-            countdowns.addView(number, margins(first ? 0 : dp(14), 0));
-            TextView caption = text(15, MUTED, bodyItalic);
-            caption.setGravity(Gravity.END);
-            caption.setText(days <= 1 ? c.name : context.getString(R.string.countdown_until, c.name));
-            countdowns.addView(caption, margins(dp(2), 0));
-            first = false;
+            LinearLayout line = new LinearLayout(context);
+            line.setOrientation(LinearLayout.HORIZONTAL);
+            line.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+            line.setBaselineAligned(false);
+            if (days > 1) {
+                TextView number = text(24, SAND, naskh);
+                number.setIncludeFontPadding(false);
+                number.setText(arabicDigits(days));
+                LinearLayout.LayoutParams np = new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                np.setMarginEnd(dp(10));
+                line.addView(number, np);
+            }
+            TextView caption = text(16, MUTED, bodyItalic);
+            caption.setText(days == 0 ? context.getString(R.string.countdown_today, c.name)
+                    : days == 1 ? context.getString(R.string.countdown_tomorrow, c.name)
+                    : context.getString(R.string.countdown_until, c.name));
+            line.addView(caption, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            countdowns.addView(line, margins(dp(4), 0));
         }
     }
 

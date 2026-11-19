@@ -4,6 +4,9 @@
     <string name="dream_name">TV list</string>
     <string name="greeting_morning">صباح الخير</string>
     <string name="greeting_evening">مساء الخير</string>
+    <!-- The greeting with the owner's name: "مساء الخير يا أكرم". -->
+    <string name="greeting_with_name">%1$s يا %2$s</string>
+    <string name="owner_name">أكرم</string>
     <string name="today_heading">Today</string>
     <string name="todo_heading">To do</string>
     <string name="todo_heading_paged">%1$s    %2$d / %3$d</string>
@@ -21,8 +24,8 @@
     <string name="game_on_now">On now</string>
     <string name="game_tomorrow">Tomorrow %1$s</string>
     <string name="countdown_until">days until %1$s</string>
-    <string name="countdown_today_word">Today</string>
-    <string name="countdown_tomorrow_word">Tomorrow</string>
+    <string name="countdown_today">Today · %1$s</string>
+    <string name="countdown_tomorrow">Tomorrow · %1$s</string>
     <string name="offline">Can\'t reach the sheet right now. Showing the last copy; trying again in a minute.</string>
     <string name="not_shared">The sheet isn\'t shared by link. In Google Sheets: Share, General access, Anyone with the link, Viewer.</string>
     <string name="no_sheet">No sheet set yet. Run addons/tv-list/setup.sh with your sheet\'s link.</string>

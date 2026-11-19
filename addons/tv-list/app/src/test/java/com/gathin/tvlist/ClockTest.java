@@ -7,10 +7,10 @@ import org.junit.Test;
 public class ClockTest {
     @Test
     public void arabicTwelveHourClock() {
-        assertEquals("٩:٠٥ م", Scene.arabicTime(21, 5));
-        assertEquals("١١:١٠ ص", Scene.arabicTime(11, 10));
-        assertEquals("١٢:٠٠ ص", Scene.arabicTime(0, 0));
-        assertEquals("١٢:٣٠ م", Scene.arabicTime(12, 30));
+        assertEquals("٩:٠٥", Scene.arabicTime(21, 5));
+        assertEquals("١١:١٠", Scene.arabicTime(11, 10));
+        assertEquals("١٢:٠٠", Scene.arabicTime(0, 0));
+        assertEquals("١٢:٣٠", Scene.arabicTime(12, 30));
     }
 
     @Test
