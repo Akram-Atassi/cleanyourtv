@@ -10,22 +10,14 @@ burn-in the whole picture drifts 6 dp round a small circle, one slow step every 
 Any key wakes the TV back to where it was. On cleanyourtv's Home it is also a module card, **TV list**: OK shows the
 list at once, and any key goes back to Home.
 
-### One button between the list and your own screensaver
+### The screensaver, and a button for it
 
-You can keep the TV's own screensaver (Google's Ambient mode, say) and put the list on a remote button instead. Map
-the button to launch **TV list**: on Google TV, Settings > Remotes & Accessories > the star-button shortcut >
-Favorite app > TV list (Button Mapper, or the launcher's `app_keys`, work too). Then the button flips between the two:
-
-| On screen | Press the button |
-|---|---|
-| The screensaver, Home or an app | The list fades in, re-reading the sheet |
-| The list | The list fades out and the TV's own screensaver starts |
-
-Any other key leaves the list. Opened over the screensaver, the list wakes the TV out of it rather than opening
-behind it. In this mode `setup.sh` is not needed for the screensaver, only to set the sheet; leave the TV's
-screensaver as it is.
-
-Package `com.gathin.tvlist`. You see it as **TV list** in the TV's screensaver settings.
+`setup.sh` makes the list the TV's screensaver and keeps the one it replaces, so `setup.sh --off` puts that back
+(Google's Ambient mode on Google TV, `com.google.android.apps.tv.dreamx/.service.Backdrop`). To show it at once, map a
+remote button to launch **TV list**: on Google TV, Settings > Remotes & Accessories > the star-button shortcut >
+Favorite app > TV list (Button Mapper, or the launcher's `app_keys`, work too). Launching TV list just starts the
+screensaver, so the button and waiting idle show the same screen. In it, the arrows flip the to-do pages when there is
+more than one; any other key wakes the TV.
 
 ## The sheet
 
