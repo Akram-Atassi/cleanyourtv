@@ -6,7 +6,7 @@ import java.util.Locale;
 
 /** The two tabs turned into what the screen shows. */
 final class Lists {
-    static final int MAX_TODOS = 12;
+    static final int MAX_TODOS = 60;   // the screen pages through them
     static final int MAX_EVENTS = 8;
     private static final int MAX_TEXT = 120;
 
@@ -109,6 +109,11 @@ final class Lists {
             return null;
         }
         return null;
+    }
+
+    /** calendar.gs writes a birthday into the Today tab with "Birthday" as its time. */
+    static boolean isBirthday(Item item) {
+        return "birthday".equalsIgnoreCase(item.detail.trim());
     }
 
     /** A Done cell that counts as done: a ticked checkbox (TRUE) or yes, x, done, 1, ✓. */

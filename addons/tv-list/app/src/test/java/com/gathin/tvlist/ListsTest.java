@@ -25,9 +25,9 @@ public class ListsTest {
     }
 
     @Test
-    public void atMostTwelveTasks() {
+    public void atMostMaxTasks() {
         StringBuilder csv = new StringBuilder("Task,Done\n");
-        for (int i = 0; i < 20; i++) csv.append("Task ").append(i).append(",FALSE\n");
+        for (int i = 0; i < Lists.MAX_TODOS + 10; i++) csv.append("Task ").append(i).append(",FALSE\n");
         assertEquals(Lists.MAX_TODOS, Lists.todos(Csv.parse(csv.toString())).size());
     }
 

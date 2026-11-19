@@ -61,7 +61,12 @@ final class Config {
 
     /** A small text file, or null when it is missing or unreadable. */
     static String read(File file) {
-        if (!file.isFile() || file.length() > 512 * 1024) return null;
+        return read(file, 512 * 1024);
+    }
+
+    /** A text file of at most {@code maxBytes}, or null when it is missing, larger or unreadable. */
+    static String read(File file, long maxBytes) {
+        if (!file.isFile() || file.length() > maxBytes) return null;
         try {
             return new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
         } catch (IOException e) {

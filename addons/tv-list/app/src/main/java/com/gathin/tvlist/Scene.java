@@ -21,25 +21,38 @@ import android.widget.TextView;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
  * What the screensaver and the card show, in the colours of the morning screen: a deep teal field with a warm amber
- * accent. On the left an Arabic greeting that follows the time of day, a large clock and the date, and today's events
- * in a panel; on the right the to-do list in a larger panel, done tasks struck through at the end. The sheet is read
- * on every start and each minute while it shows; the last good copy shows at once. The whole picture drifts a few dp,
+ * accent. On the left an Arabic greeting that follows the time of day, a large clock and the date, today's birthdays
+ * in red, the countdowns and the Lakers' next game with where to watch it. On the right today's events (hidden when
+ * there are none) and the to-do list. Every open task is shown: the list goes to two columns and smaller type when it
+ * is long, and pages by itself (Left/Right or Up/Down flip pages) when even that does not fit. The sheet is read on
+ * every start and each minute while it shows; the last good copy shows at once. The whole picture drifts a few dp,
  * very slowly, against burn-in.
  */
 final class Scene {
     static final int AMBER = 0xFFF2B35B;
     static final int CORAL = 0xFFFF7F6A;
+    static final int RED = 0xFFFF5C5C;
     static final int INK = 0xFFF4EFE6;
     static final int INK_DIM = 0x99F4EFE6;
     static final int INK_FAINT = 0x66F4EFE6;
     private static final long RETRY_MS = 60_000L;
+    private static final long PAGE_MS = 12_000L;
     private static final int SHIFT_DP = 6;
     private static final int SHIFT_STEPS = 8;
     private static final long SHIFT_EVERY_MS = 2 * 60_000L;
@@ -51,7 +64,9 @@ final class Scene {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final FrameLayout stage;
     private final TextView greeting;
+    private final TextView birthdays;
     private final LinearLayout countdowns;
+    private final LinearLayout game;
     private final LinearLayout events;
     private final LinearLayout todos;
     private final TextView status;
@@ -60,11 +75,15 @@ final class Scene {
     private boolean running;
     private boolean failed;
     private int shiftStep;
+    private int todoPage;
+    private int todoPages = 1;
     private ExecutorService executor;
 
     private final Runnable refresh = this::refresh;
     private final Runnable shift = this::shift;
     private final Runnable tick = this::tick;
+    private final Runnable nextPage = () -> page(1);
+    private final Runnable relayout = this::fillTodos;
 
     Scene(Context context) {
         this.context = context;
@@ -85,49 +104,44 @@ final class Scene {
         plp.setMargins(dp(64), dp(48), dp(64), dp(40));
         stage.addView(page, plp);
 
-        // Left: greeting, clock, date, today's events, and the status line at the bottom.
+        // Left: greeting, birthdays, countdowns, the game, and an error line at the bottom when there is one.
         LinearLayout left = new LinearLayout(context);
         left.setOrientation(LinearLayout.VERTICAL);
-        LinearLayout.LayoutParams llp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 0.42f);
+        LinearLayout.LayoutParams llp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 0.36f);
         llp.setMarginEnd(dp(40));
         page.addView(left, llp);
 
-        // Left-aligned with the clock, though Arabic would otherwise start on the right.
-        greeting = text(28, AMBER);
-        greeting.setTextAlignment(View.TEXT_ALIGNMENT_GRAVITY);
-        greeting.setGravity(Gravity.LEFT);
+        // Arabic reads right to left, so it starts at the right edge of the column.
+        greeting = text(44, AMBER);
+        greeting.setTextDirection(View.TEXT_DIRECTION_RTL);
+        greeting.setTextAlignment(View.TEXT_ALIGNMENT_TEXT_START);
         left.addView(greeting, margins(0, 0));
 
-        TextClock clock = new TextClock(context);
-        clock.setFormat12Hour("h:mm");
-        clock.setFormat24Hour("HH:mm");
-        clock.setTextColor(INK);
-        clock.setTextSize(TypedValue.COMPLEX_UNIT_SP, 104);
-        clock.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-        clock.setLetterSpacing(-0.02f);
-        clock.setIncludeFontPadding(false);
-        left.addView(clock, margins(dp(2), 0));
-
-        TextClock date = new TextClock(context);
-        date.setFormat12Hour("EEEE, MMMM d");
-        date.setFormat24Hour("EEEE, d MMMM");
-        date.setTextColor(INK_DIM);
-        date.setTextSize(TypedValue.COMPLEX_UNIT_SP, 22);
-        left.addView(date, margins(dp(6), 0));
+        // Today's birthdays, in red, right under the greeting; gone on other days.
+        birthdays = text(24, RED);
+        birthdays.setMaxLines(3);
+        birthdays.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        birthdays.setVisibility(View.GONE);
+        left.addView(birthdays, margins(dp(10), 0));
 
         countdowns = new LinearLayout(context);
         countdowns.setOrientation(LinearLayout.VERTICAL);
-        left.addView(countdowns, margins(dp(28), 0));
+        left.addView(countdowns, margins(dp(30), 0));
 
-        // The status line at the bottom of the left column.
+        game = new LinearLayout(context);
+        game.setOrientation(LinearLayout.VERTICAL);
+        left.addView(game, margins(dp(34), 0));
+
         left.addView(new View(context), new LinearLayout.LayoutParams(0, 0, 1f));
-        status = text(13, INK_FAINT);
+        status = text(14, CORAL);
+        status.setMaxLines(3);
+        status.setVisibility(View.GONE);
         left.addView(status, margins(0, 0));
 
         // Right: today's events at full width, then the to-do list, the reason for this screen.
         LinearLayout right = new LinearLayout(context);
         right.setOrientation(LinearLayout.VERTICAL);
-        page.addView(right, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 0.58f));
+        page.addView(right, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 0.64f));
         events = panel(right, R.string.today_heading, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT), 0);
         todos = panel(right, R.string.todo_heading, new LinearLayout.LayoutParams(
@@ -142,8 +156,12 @@ final class Scene {
         handler.postDelayed(shift, SHIFT_EVERY_MS);
         // The last copy at once, then the sheet itself: every start reads it, so an edit shows the next time.
         showLists();
-        if (sheetId == null) status.setText(R.string.no_sheet);
-        else refresh();
+        if (sheetId == null) {
+            status.setText(R.string.no_sheet);
+            status.setVisibility(View.VISIBLE);
+        } else {
+            refresh();
+        }
         tick();
     }
 
@@ -153,6 +171,14 @@ final class Scene {
         stage.animate().cancel();
         if (executor != null) executor.shutdownNow();
         executor = null;
+    }
+
+    /** Flips the to-do pages by {@code delta}; false when there is only one page, so the key can do something else. */
+    boolean page(int delta) {
+        if (todoPages <= 1) return false;
+        todoPage = ((todoPage + delta) % todoPages + todoPages) % todoPages;
+        fillTodos();
+        return true;
     }
 
     private void refresh() {
@@ -169,6 +195,11 @@ final class Scene {
                 Log.w("TvList", "refresh: " + e);
                 error = R.string.offline;
             }
+            try {
+                Team.refresh(dir, System.currentTimeMillis());
+            } catch (IOException | RuntimeException e) {
+                Log.w("TvList", "team: " + e);   // the last copy stays
+            }
             int result = error;
             handler.post(() -> loaded(result));
         });
@@ -178,32 +209,25 @@ final class Scene {
         if (!running) return;
         handler.removeCallbacks(refresh);
         failed = error != 0;
+        showLists();
+        // Only a problem is worth a line; when all is well there is none.
+        status.setVisibility(failed ? View.VISIBLE : View.GONE);
         if (failed) {
             status.setText(error);
-            status.setTextColor(CORAL);
             handler.postDelayed(refresh, RETRY_MS);
             return;
         }
-        status.setTextColor(INK_FAINT);
-        showLists();
         tick();
         handler.postDelayed(refresh, Sheet.REFRESH_MS);
     }
 
-    /** Once a minute: the greeting for the time of day, and "Updated 3 minutes ago" unless an error is showing. */
+    /** Once a minute: the greeting for the time of day, the countdowns' day and the game's start. */
     private void tick() {
         handler.removeCallbacks(tick);
         if (!running) return;
         greeting.setText(greeting(Calendar.getInstance().get(Calendar.HOUR_OF_DAY)));
         showCountdowns();   // the day may have changed
-        if (sheetId != null && !failed) {
-            long when = Sheet.cacheTime(dir);
-            long now = System.currentTimeMillis();
-            if (when == 0) status.setText(R.string.loading);
-            else if (now - when < 60_000L) status.setText(R.string.updated_now);
-            else status.setText(context.getString(R.string.updated, DateUtils.getRelativeTimeSpanString(
-                    Math.min(when, now), now, DateUtils.MINUTE_IN_MILLIS)));
-        }
+        showGame();         // and the game may have started
         handler.postDelayed(tick, 60_000L);
     }
 
@@ -213,17 +237,29 @@ final class Scene {
     }
 
     private void showLists() {
-        List<Lists.Item> today = Lists.events(Csv.parse(Config.read(new File(dir, Sheet.TODAY_CACHE))));
-        List<Lists.Item> list = Lists.todos(Csv.parse(Config.read(new File(dir, Sheet.TODO_CACHE))));
-        fill(events, today, R.string.no_events, true);
-        fill(todos, list, R.string.no_todos, false);
+        // Birthdays come in the Today tab with "Birthday" as their time; they go under the date, not in the list.
+        List<Lists.Item> today = new ArrayList<>();
+        List<String> born = new ArrayList<>();
+        for (Lists.Item item : Lists.events(Csv.parse(Config.read(new File(dir, Sheet.TODAY_CACHE))))) {
+            if (Lists.isBirthday(item)) born.add(item.text);
+            else today.add(item);
+        }
+        birthdays.setVisibility(born.isEmpty() ? View.GONE : View.VISIBLE);
+        birthdays.setText("🎂  " + TextUtils.join("  ·  ", born));
+
+        boolean anyEvents = !today.isEmpty();
+        events.setVisibility(anyEvents ? View.VISIBLE : View.GONE);
+        ((LinearLayout.LayoutParams) todos.getLayoutParams()).topMargin = anyEvents ? dp(20) : 0;
+        fill(events, today);
+        fillTodos();
         showCountdowns();
+        showGame();
     }
 
-    /** "7  days · Chess World Championship" under the date, soonest first; nothing when the tab is empty. */
+    /** "23  days · Finals start" under the date, soonest first; nothing when the tab is empty. */
     private void showCountdowns() {
         countdowns.removeAllViews();
-        java.time.LocalDate today = java.time.LocalDate.now();
+        LocalDate today = LocalDate.now();
         for (Lists.Countdown c : Lists.countdowns(
                 Csv.parse(Config.read(new File(dir, Sheet.COUNTDOWN_CACHE))), today)) {
             long days = c.daysFrom(today);
@@ -247,22 +283,152 @@ final class Scene {
                 label.setText(context.getString(R.string.countdown_days, c.name));
             }
             line.addView(label, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-            countdowns.addView(line, margins(dp(8), 0));
+            countdowns.addView(line, margins(dp(6), 0));
         }
-    }
-    /** Rows under a heading; the heading (child 0) stays. */
-    private void fill(LinearLayout panel, List<Lists.Item> items, int empty, boolean event) {
-        panel.removeViews(1, panel.getChildCount() - 1);
-        if (items.isEmpty()) {
-            TextView none = text(22, INK_FAINT);
-            none.setText(empty);
-            panel.addView(none, margins(dp(18), 0));
-            return;
-        }
-        for (Lists.Item item : items) panel.addView(row(item, event), margins(dp(event ? 8 : 14), 0));
     }
 
-    private View row(Lists.Item item, boolean event) {
+    /** "LAKERS TONIGHT / @ Utah Jazz / 10:00 PM · Prime Video", or the next game when there is none tonight. */
+    private void showGame() {
+        game.removeAllViews();
+        Team.Game g = Team.next(dir, Instant.now());
+        if (g == null) return;
+        ZoneId zone = ZoneId.systemDefault();
+        ZonedDateTime start = g.start.atZone(zone);
+        long days = ChronoUnit.DAYS.between(LocalDate.now(zone), start.toLocalDate());
+        boolean tonight = days <= 0;
+        boolean onNow = !Instant.now().isBefore(g.start);
+        String time = android.text.format.DateFormat.getTimeFormat(context).format(Date.from(g.start));
+
+        TextView title = heading(tonight ? context.getString(R.string.game_tonight, Team.TEAM_NAME)
+                : context.getString(R.string.game_next, Team.TEAM_NAME));
+        game.addView(title);
+
+        TextView match = text(26, INK);
+        match.setText((g.home ? "vs " : "@ ") + g.opponent);
+        match.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        game.addView(match, margins(dp(6), 0));
+
+        String when = onNow ? context.getString(R.string.game_on_now)
+                : tonight ? time
+                : days == 1 ? context.getString(R.string.game_tomorrow, time)
+                : start.format(DateTimeFormatter.ofPattern("EEEE", Locale.getDefault())) + " " + time;
+        TextView watch = text(19, INK_DIM);
+        watch.setMaxLines(2);
+        watch.setText(when + "  ·  " + g.whereToWatch());
+        game.addView(watch, margins(dp(4), 0));
+    }
+
+    /** Today's events under their heading; the heading (child 0) stays. */
+    private void fill(LinearLayout panel, List<Lists.Item> items) {
+        panel.removeViews(1, panel.getChildCount() - 1);
+        for (Lists.Item item : items) panel.addView(row(item, true, 19), margins(dp(8), 0));
+    }
+
+    /**
+     * Every open task. One column at full size when they fit; otherwise two columns in smaller type; otherwise pages
+     * of two columns, turning every {@link #PAGE_MS}. Done tasks fold into one line at the bottom.
+     */
+    private void fillTodos() {
+        handler.removeCallbacks(nextPage);
+        handler.removeCallbacks(relayout);
+        TextView title = (TextView) todos.getChildAt(0);
+        todos.removeViews(1, todos.getChildCount() - 1);
+        List<Lists.Item> open = new ArrayList<>();
+        int done = 0;
+        for (Lists.Item item : Lists.todos(Csv.parse(Config.read(new File(dir, Sheet.TODO_CACHE))))) {
+            if (item.done) done++;
+            else open.add(item);
+        }
+        title.setText(R.string.todo_heading);
+        todoPages = 1;
+        if (open.isEmpty()) {
+            TextView none = text(22, INK_FAINT);
+            none.setText(R.string.no_todos);
+            todos.addView(none, margins(dp(18), 0));
+            footer(done);
+            return;
+        }
+        if (todos.getHeight() == 0) {
+            // Not laid out yet: measure on the next frame.
+            if (running) handler.post(relayout);
+            return;
+        }
+        int avail = todos.getHeight() - todos.getPaddingTop() - todos.getPaddingBottom() - title.getHeight()
+                - (done > 0 ? dp(40) : 0);
+        int width = todos.getWidth() - todos.getPaddingLeft() - todos.getPaddingRight();
+
+        // The first layout that holds every task, measured with the tasks wrapped as they really wrap: one column
+        // at full size, one column a little smaller, two columns. Only when even two columns of small type are not
+        // enough does the list page, as many tasks per page as fit.
+        int[][] layouts = {{1, 23, 14}, {1, 20, 10}, {2, 20, 10}, {2, 18, 8}};   // columns, sp, gap dp
+        int[] chosen = layouts[layouts.length - 1];
+        int perPage = 0;
+        for (int[] l : layouts) {
+            if (fits(grid(open, l), width, avail)) {
+                chosen = l;
+                perPage = open.size();
+                break;
+            }
+        }
+        if (perPage == 0) {
+            perPage = 1;
+            for (int k = open.size() - 1; k > 1; k--) {
+                if (fits(grid(open.subList(0, k), chosen), width, avail)) {
+                    perPage = k;
+                    break;
+                }
+            }
+        }
+        todoPages = (open.size() + perPage - 1) / perPage;
+        todoPage = Math.min(todoPage, todoPages - 1);
+        List<Lists.Item> shown = open.subList(todoPage * perPage, Math.min(open.size(), (todoPage + 1) * perPage));
+        if (todoPages > 1) {
+            title.setText(context.getString(R.string.todo_heading_paged, context.getString(R.string.todo_heading),
+                    todoPage + 1, todoPages));
+            handler.postDelayed(nextPage, PAGE_MS);
+        }
+        todos.addView(grid(shown, chosen), margins(0, 0));
+        footer(done);
+    }
+
+    /** The tasks in {@code layout[0]} balanced columns of {@code layout[1]} sp, {@code layout[2]} dp apart. */
+    private LinearLayout grid(List<Lists.Item> items, int[] layout) {
+        int columns = layout[0];
+        int perColumn = (items.size() + columns - 1) / columns;   // five tasks go three and two
+        LinearLayout grid = new LinearLayout(context);
+        grid.setOrientation(LinearLayout.HORIZONTAL);
+        grid.setBaselineAligned(false);
+        for (int c = 0; c < columns; c++) {
+            LinearLayout column = new LinearLayout(context);
+            column.setOrientation(LinearLayout.VERTICAL);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+            if (c < columns - 1) lp.setMarginEnd(dp(24));
+            grid.addView(column, lp);
+            for (int i = c * perColumn; i < Math.min(items.size(), (c + 1) * perColumn); i++) {
+                column.addView(row(items.get(i), false, layout[1]), margins(dp(layout[2]), 0));
+            }
+        }
+        return grid;
+    }
+
+    /** Whether {@code grid}, laid out {@code width} px wide, is at most {@code height} px tall. */
+    private static boolean fits(View grid, int width, int height) {
+        grid.setLayoutParams(new ViewGroup.LayoutParams(width, ViewGroup.LayoutParams.WRAP_CONTENT));
+        grid.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
+        return grid.getMeasuredHeight() <= height;
+    }
+
+    /** "✓ 3 done" at the bottom of the to-do panel. */
+    private void footer(int done) {
+        if (done == 0) return;
+        todos.addView(new View(context), new LinearLayout.LayoutParams(0, 0, 1f));
+        TextView line = text(15, INK_FAINT);
+        line.setText(context.getResources().getQuantityString(R.plurals.todo_done, done, done));
+        todos.addView(line, margins(dp(8), 0));
+    }
+
+    private View row(Lists.Item item, boolean event, int sp) {
         LinearLayout row = new LinearLayout(context);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.TOP);
@@ -275,11 +441,10 @@ final class Scene {
             time.setPadding(0, dp(3), 0, 0);
             row.addView(time, new LinearLayout.LayoutParams(dp(78), ViewGroup.LayoutParams.WRAP_CONTENT));
         }
-        TextView label = text(event ? 19 : 23, item.done ? INK_FAINT : INK);
+        TextView label = text(sp, item.done ? INK_FAINT : INK);
         label.setText(item.text);
-        // Events stay on one line so several fit beside the clock; tasks may take two.
-        label.setMaxLines(event ? 1 : 2);
-        label.setLineSpacing(0, 1.05f);
+        // Wrap rather than cut a task or an event short with "…".
+        label.setMaxLines(event ? 2 : 3);
         if (!event) row.addView(checkbox(item.done), boxParams(label.getLineHeight()));
         if (item.done) label.setPaintFlags(label.getPaintFlags() | Paint.STRIKE_THRU_TEXT_FLAG);
         row.addView(label, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
@@ -305,7 +470,7 @@ final class Scene {
         return box;
     }
 
-    /** The box centred on the first line of its task, however many lines the task takes. */
+    /** The box centred on the first line of its task. */
     private LinearLayout.LayoutParams boxParams(int lineHeight) {
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(20), dp(20));
         lp.topMargin = Math.max(0, (lineHeight - dp(20)) / 2);
@@ -325,13 +490,18 @@ final class Scene {
         panel.setPadding(dp(30), dp(22), dp(30), dp(20));
         lp.topMargin = top;
         parent.addView(panel, lp);
+        panel.addView(heading(context.getString(heading)));
+        return panel;
+    }
+
+    /** Small amber capitals, as every heading on this screen. */
+    private TextView heading(String text) {
         TextView title = text(14, AMBER);
-        title.setText(heading);
+        title.setText(text);
         title.setAllCaps(true);
         title.setLetterSpacing(0.16f);
         title.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-        panel.addView(title);
-        return panel;
+        return title;
     }
 
     private void shift() {

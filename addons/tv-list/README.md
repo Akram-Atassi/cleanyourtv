@@ -40,6 +40,16 @@ An optional third tab, `Countdowns` (column A the name, column B the date as `20
 as plain text), puts up to three countdowns under the date: "7 days · Chess World Championship", then "Tomorrow" and
 "Today", and a date that has passed drops off by itself.
 
+Beside the countdowns sits the Lakers' game tonight, or their next one: the opponent, home or away, the time, and
+where to watch from outside Los Angeles, from ESPN's public schedule (no key). A national broadcaster that streams on
+one of the services in `Team.MY_SERVICES` (NBC on Peacock, Prime Video) comes first, then the national channel
+itself, then NBA League Pass for a game only on the Lakers' own regional network. Change `Team.TEAM` for another team.
+
+Every open task is shown, wrapped rather than cut short: one column when they fit, two balanced columns in smaller
+type when they do not, and only past that do they page every 12 seconds (Left/Right or Up/Down on the remote flip
+pages). Done tasks fold into one "✓ 3 done" line. A birthday in the Today tab (calendar.gs writes `Birthday` as its
+time) shows in red under the greeting instead of in the list, and Today disappears on a day with nothing in it.
+
 Row 1 is a header and is skipped. Empty rows are skipped. Format the Time column as plain text (Format > Number >
 Plain text): Google's CSV export gives a column one type, so in a column of times a word like `All day` comes out
 empty. The screen shows at most 12 tasks and 8 events, each cut

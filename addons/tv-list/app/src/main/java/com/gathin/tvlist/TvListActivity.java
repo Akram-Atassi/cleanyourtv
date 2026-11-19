@@ -86,8 +86,15 @@ public class TvListActivity extends Activity {
     public boolean dispatchKeyEvent(KeyEvent event) {
         if (event.getAction() != KeyEvent.ACTION_DOWN || leaving) return true;
         int key = event.getKeyCode();
-        if (key == KeyEvent.KEYCODE_MACRO_1 || key == KeyEvent.KEYCODE_BOOKMARK) toScreensaver();
-        else leave();
+        if (key == KeyEvent.KEYCODE_MACRO_1 || key == KeyEvent.KEYCODE_BOOKMARK) {
+            toScreensaver();
+            return true;
+        }
+        // The arrows flip the to-do pages when the list has more than one; otherwise they leave like any key.
+        boolean forward = key == KeyEvent.KEYCODE_DPAD_RIGHT || key == KeyEvent.KEYCODE_DPAD_DOWN;
+        boolean back = key == KeyEvent.KEYCODE_DPAD_LEFT || key == KeyEvent.KEYCODE_DPAD_UP;
+        if ((forward || back) && scene != null && scene.page(forward ? 1 : -1)) return true;
+        leave();
         return true;
     }
 

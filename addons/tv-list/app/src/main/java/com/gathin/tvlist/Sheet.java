@@ -46,6 +46,11 @@ final class Sheet {
     }
 
     static String fetch(String url) throws IOException {
+        return fetch(url, MAX_BYTES);
+    }
+
+    /** A GET of at most {@code maxBytes}; a private sheet's sign-in page is a {@link NotSharedException}. */
+    static String fetch(String url, int maxBytes) throws IOException {
         HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
         connection.setConnectTimeout(TIMEOUT_MS);
         connection.setReadTimeout(TIMEOUT_MS);
@@ -60,20 +65,20 @@ final class Sheet {
             // A private sheet redirects to Google's sign-in page, which arrives as HTML with 200.
             if (type.contains("html")) throw new NotSharedException();
             try (InputStream in = connection.getInputStream()) {
-                return read(in);
+                return read(in, maxBytes);
             }
         } finally {
             connection.disconnect();
         }
     }
 
-    static String read(InputStream in) throws IOException {
+    static String read(InputStream in, int maxBytes) throws IOException {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         byte[] buffer = new byte[8192];
         int n;
         while ((n = in.read(buffer)) > 0) {
             out.write(buffer, 0, n);
-            if (out.size() > MAX_BYTES) throw new IOException("sheet too large");
+            if (out.size() > maxBytes) throw new IOException("reply over " + maxBytes + " bytes");
         }
         return new String(out.toByteArray(), StandardCharsets.UTF_8);
     }
