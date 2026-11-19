@@ -107,14 +107,10 @@ TV_HOST=192.168.1.50 addons/tv-list/build-and-install.sh --uninstall
 
 ## Look
 
-Top right: the greeting with tonight's moon, then the time in Arabic numerals (٩:١٥ م) and the date. At the foot of the right column, Now playing (song, artist, album art) while music plays on the TV, and On this day otherwise.
+Top right: the greeting by name, then the time in Arabic numerals (٩:١٥ م) and the date. At the foot of the right column, Now playing (song, artist, album art) while music plays on the TV, and On this day otherwise.
 
 
-Set like a printed page: a warm near-black field with a faint vignette and film grain, tasks and events in
-[Fraunces](https://github.com/undercasetype/Fraunces) (bundled in `app/src/main/assets/fonts`, SIL Open Font License,
-`OFL-Fraunces.txt` beside it), labels in Roboto, the greeting in Noto Naskh Arabic. Beside the greeting, tonight's
-moon in its real phase (computed on the TV), or the sun in the morning. Today is a timeline: past events fade and the
-next one's time is in sand. The Lakers' block carries a purple and gold stripe.
+Paintings from the Art Institute of Chicago's public-domain collection fill the background, one at a time, crossfading every 45 seconds, never repeating until every one in the pool (up to 120, two new pages of the collection a week) has shown; the caption names the artist and the work. A dark scrim and a soft shadow keep the type readable over them, with a fine grain on top. Tasks and events are set in [Fraunces](https://github.com/undercasetype/Fraunces) (bundled in `app/src/main/assets/fonts`, SIL Open Font License, `OFL-Fraunces.txt` beside it), labels in Roboto, the greeting and the clock in Noto Naskh Arabic. Today is a timeline: an event leaves the minute it ends, the one on shows Now and the next one's time is in sand. Nothing is ever cut short with an ellipsis: text wraps, the list shrinks its type and then pages.
 
 ## Permissions
 

@@ -77,7 +77,8 @@ final class Scene {
     private final Typeface sansMedium = sans(500);
     private final FrameLayout stage;
     private final TextView greeting;
-    private final SkyMark sky;
+    private final BackdropView backdrop;
+    private final TextView credit;
     private final TextView clock;
     private final TextView date;
     private final LinearLayout mediaBox;
@@ -89,6 +90,7 @@ final class Scene {
     private boolean mediaShowing;
     private final TextView birthdays;
     private final LinearLayout countdowns;
+    private LinearLayout rightColumn;
     private final LinearLayout game;
     private final LinearLayout events;
     private final LinearLayout todos;
@@ -128,24 +130,45 @@ final class Scene {
         heading = fraunces(context, false, 500, 72, 30, 1);
 
         root = new FrameLayout(context);
-        // A faint vignette: a touch lighter in the middle, darker at the edges. Depth without a glow.
-        GradientDrawable paper = new GradientDrawable();
-        paper.setGradientType(GradientDrawable.RADIAL_GRADIENT);
-        paper.setColors(new int[]{0xFF191715, PAPER, 0xFF0B0A09});
-        paper.setGradientRadius(context.getResources().getDisplayMetrics().widthPixels * 0.75f);
-        // Over it a fine grain, so the black reads as printed rather than flat.
-        root.setBackground(new android.graphics.drawable.LayerDrawable(new android.graphics.drawable.Drawable[]{
-                paper, grain(context)}));
+        root.setBackgroundColor(PAPER);
+        FrameLayout.LayoutParams full = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+        // Behind everything, the pictures: Wikipedia's Picture of the Day and paintings, drifting and crossfading.
+        credit = text(13, 0x99EFEBE3, bodyItalic);
+        backdrop = new BackdropView(context, this::showCredit);
+        root.addView(backdrop, full);
+        // Over them a scrim, darkest behind the text: the list on the left, the column on the right, the foot.
+        View scrim = new View(context);
+        GradientDrawable across = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[]{0xF0121110, 0xD9121110, 0x8C121110, 0xC8121110, 0xF2121110});
+        GradientDrawable down = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{0x66121110, 0x00121110, 0x00121110, 0x99121110});
+        scrim.setBackground(new android.graphics.drawable.LayerDrawable(
+                new android.graphics.drawable.Drawable[]{across, down}));
+        root.addView(scrim, new FrameLayout.LayoutParams(full));
+        // And a fine grain over all, so it reads as a print.
+        View grainView = new View(context);
+        grainView.setBackground(grain(context));
+        root.addView(grainView, new FrameLayout.LayoutParams(full));
         root.setKeepScreenOn(true);
         stage = new FrameLayout(context);
         root.addView(stage, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        // What the picture is, small, in the top-left corner above the list.
+        // Two lines if it needs them: a caption is never cut short with an ellipsis.
+        credit.setMaxLines(2);
+        credit.setEllipsize(null);
+        credit.setLineSpacing(0, 1.1f);
+        FrameLayout.LayoutParams clp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP | Gravity.START);
+        clp.setMargins(dp(88), dp(20), dp(440), 0);
+        root.addView(credit, clp);
 
         LinearLayout page = new LinearLayout(context);
         page.setOrientation(LinearLayout.HORIZONTAL);
         FrameLayout.LayoutParams plp = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
-        plp.setMargins(dp(88), dp(64), dp(88), dp(56));
+        plp.setMargins(dp(88), dp(76), dp(88), dp(44));   // the top strip holds the picture's caption
         stage.addView(page, plp);
 
         // Left: today's events, then the to-do list, the reason for this screen.
@@ -164,10 +187,15 @@ final class Scene {
         // Right, flush right: greeting, birthdays, countdowns, the game, and an error line when there is one.
         LinearLayout right = new LinearLayout(context);
         right.setOrientation(LinearLayout.VERTICAL);
-        right.setGravity(Gravity.END);
+        right.setGravity(Gravity.RIGHT);
         LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 0.40f);
         rlp.setMarginStart(dp(56));
+        // The list leaves a strip at the top for the picture's caption; the column on the right has no caption above
+        // it, so it starts higher.
+        rlp.topMargin = -dp(40);
         page.addView(right, rlp);
+        rightColumn = right;
+        right.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> handler.post(this::fitRight));
         // The moon's glow spills past the column and the page margin instead of stopping at a hard edge.
         right.setClipChildren(false);
         page.setClipChildren(false);
@@ -179,7 +207,6 @@ final class Scene {
         // the column's left in the same band, its glow behind.
         FrameLayout top = new FrameLayout(context);
         top.setClipChildren(false);
-        sky = new SkyMark(context);
         greeting = text(36, INK, naskh);
         greeting.setTextDirection(View.TEXT_DIRECTION_RTL);
         greeting.setIncludeFontPadding(false);
@@ -190,10 +217,9 @@ final class Scene {
         right.addView(top, tp);
 
         // The time in Arabic numerals, with ص or م, and the date under it in italic.
-        // Tonight's moon (or the sun) rides beside the clock, at the left of the same band, its glow behind.
+        // The clock, flush right.
         FrameLayout timeBand = new FrameLayout(context);
         timeBand.setClipChildren(false);
-        timeBand.addView(sky, new FrameLayout.LayoutParams(dp(92), dp(92), Gravity.START | Gravity.CENTER_VERTICAL));
         clock = text(46, INK, naskh);
         clock.setTextDirection(View.TEXT_DIRECTION_RTL);
         clock.setIncludeFontPadding(false);
@@ -202,13 +228,13 @@ final class Scene {
                 ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.END | Gravity.CENTER_VERTICAL));
         right.addView(timeBand, margins(dp(4), 0));
         date = text(18, MUTED, bodyItalic);
-        date.setGravity(Gravity.END);
+        date.setGravity(Gravity.RIGHT);
         right.addView(date, margins(dp(2), 0));
 
         // Today's birthdays, in red, right under the date; gone on other days.
         birthdays = text(20, RED, bodyItalic);
         birthdays.setMaxLines(3);
-        birthdays.setGravity(Gravity.END);
+        birthdays.setGravity(Gravity.RIGHT);
         birthdays.setVisibility(View.GONE);
         right.addView(birthdays, margins(dp(8), 0));
 
@@ -227,7 +253,7 @@ final class Scene {
         // At the foot: on this day in history, one event at a time, crossfading.
         historyBox = new LinearLayout(context);
         historyBox.setOrientation(LinearLayout.VERTICAL);
-        historyBox.setGravity(Gravity.END);
+        historyBox.setGravity(Gravity.RIGHT);
         historyBox.setVisibility(View.GONE);
         right.addView(historyBox, margins(dp(18), 0));
         LinearLayout historyHead = new LinearLayout(context);
@@ -245,7 +271,7 @@ final class Scene {
         historyText = text(16, 0xFFC9C3B8, body);
         historyText.setMaxLines(HISTORY_LINES);
         historyText.setEllipsize(null);
-        historyText.setGravity(Gravity.END);
+        historyText.setGravity(Gravity.RIGHT);
         historyText.setLineSpacing(0, 1.1f);
         historyBox.addView(historyText, margins(dp(4), 0));
         // Now playing, in the history's place while music plays: song and artist, the album art at the edge.
@@ -256,16 +282,20 @@ final class Scene {
         right.addView(mediaBox, margins(dp(18), 0));
         LinearLayout mediaText = new LinearLayout(context);
         mediaText.setOrientation(LinearLayout.VERTICAL);
-        mediaText.setGravity(Gravity.END);
+        mediaText.setGravity(Gravity.RIGHT);
         mediaBox.addView(mediaText, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         TextView mediaLabel = label(context.getString(R.string.now_playing));
-        mediaLabel.setGravity(Gravity.END);
+        mediaLabel.setGravity(Gravity.RIGHT);
         mediaText.addView(mediaLabel, margins(0, 0));
         mediaTitle = text(20, INK, body);
-        mediaTitle.setGravity(Gravity.END);
+        mediaTitle.setMaxLines(2);
+        mediaTitle.setEllipsize(null);
+        mediaTitle.setGravity(Gravity.RIGHT);
         mediaText.addView(mediaTitle, margins(dp(6), 0));
         mediaArtist = text(15, MUTED, bodyItalic);
-        mediaArtist.setGravity(Gravity.END);
+        mediaArtist.setMaxLines(2);
+        mediaArtist.setEllipsize(null);
+        mediaArtist.setGravity(Gravity.RIGHT);
         mediaText.addView(mediaArtist, margins(dp(2), 0));
         mediaArt = new android.widget.ImageView(context);
         mediaArt.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
@@ -282,7 +312,7 @@ final class Scene {
 
         status = text(14, RED, sans);
         status.setMaxLines(3);
-        status.setGravity(Gravity.END);
+        status.setGravity(Gravity.RIGHT);
         status.setVisibility(View.GONE);
         right.addView(status, margins(0, 0));
     }
@@ -304,6 +334,8 @@ final class Scene {
         tick();
         clockTick();
         startMedia();
+        backdrop.setPictures(Backdrop.pictures(dir));
+        backdrop.start();
     }
 
     void stop() {
@@ -312,6 +344,7 @@ final class Scene {
         stage.animate().cancel();
         historyBox.animate().cancel();
         stopMedia();
+        backdrop.stop();
         if (executor != null) executor.shutdownNow();
         executor = null;
     }
@@ -348,6 +381,7 @@ final class Scene {
             } catch (IOException | RuntimeException e) {
                 Log.w("TvList", "history: " + e);
             }
+            Backdrop.refresh(dir, LocalDate.now());
             int result = error;
             handler.post(() -> loaded(result));
         });
@@ -357,6 +391,7 @@ final class Scene {
         if (!running) return;
         handler.removeCallbacks(refresh);
         failed = error != 0;
+        backdrop.setPictures(Backdrop.pictures(dir));
         showLists();
         // Only a problem is worth a line; when all is well there is none.
         status.setVisibility(failed ? View.VISIBLE : View.GONE);
@@ -376,7 +411,6 @@ final class Scene {
         int hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
         greeting.setText(context.getString(R.string.greeting_with_name, context.getString(greeting(hour)),
                 context.getString(R.string.owner_name)));
-        sky.set(greeting(hour) == R.string.greeting_morning, System.currentTimeMillis());
         showToday();        // events leave the minute they end
         showCountdowns();
         showGame();
@@ -429,13 +463,52 @@ final class Scene {
                 state = NEXT;
                 nextFound = true;
             }
-            events.addView(eventRow(item, state), margins(dp(10), 0));
+            events.addView(eventRow(item, state), margins(dp(8), 0));
             shown++;
         }
         boolean any = shown > 0;
         events.setVisibility(any ? View.VISIBLE : View.GONE);
-        ((LinearLayout.LayoutParams) todos.getLayoutParams()).topMargin = any ? dp(40) : 0;
+        ((LinearLayout.LayoutParams) todos.getLayoutParams()).topMargin = any ? dp(26) : 0;
         todos.requestLayout();
+    }
+
+    /**
+     * When the right column holds more than it has room for (a birthday, three countdowns, the game and a song),
+     * the least needed goes first: the countdowns, latest first, then On this day. The greeting, clock, date,
+     * birthdays, the game and Now playing always stay.
+     */
+    private void fitRight() {
+        LinearLayout col = rightColumn;
+        if (col == null || col.getHeight() == 0) return;
+        int width = View.MeasureSpec.makeMeasureSpec(col.getWidth(), View.MeasureSpec.EXACTLY);
+        int free = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED);
+        while (true) {
+            int total = 0;
+            for (int i = 0; i < col.getChildCount(); i++) {
+                View child = col.getChildAt(i);
+                if (child.getVisibility() == View.GONE) continue;
+                child.measure(width, free);
+                LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) child.getLayoutParams();
+                total += child.getMeasuredHeight() + lp.topMargin + lp.bottomMargin;
+            }
+            if (total <= col.getHeight()) return;
+            if (countdowns.getChildCount() > 0) {
+                countdowns.removeViewAt(countdowns.getChildCount() - 1);
+            } else if (historyBox.getVisibility() == View.VISIBLE) {
+                historyBox.setVisibility(View.GONE);
+            } else {
+                return;   // nothing left that may go
+            }
+        }
+    }
+
+    /** The picture's caption, crossfading with it. */
+    private void showCredit(String text) {
+        credit.animate().cancel();
+        credit.animate().alpha(0f).setDuration(600).withEndAction(() -> {
+            credit.setText(italic(text));
+            credit.animate().alpha(1f).setDuration(1200).start();
+        }).start();
     }
 
     /** The time as ٩:١٥, the date in words; again at the turn of the next minute. */
@@ -641,7 +714,7 @@ final class Scene {
         // The team's colours, a thin purple and gold stripe over the label.
         LinearLayout stripe = new LinearLayout(context);
         stripe.setOrientation(LinearLayout.HORIZONTAL);
-        stripe.setGravity(Gravity.END);
+        stripe.setGravity(Gravity.RIGHT);
         for (int colour : Team.COLOURS) {
             View bar = new View(context);
             bar.setBackgroundColor(colour);
@@ -651,11 +724,11 @@ final class Scene {
 
         TextView label = label(tonight ? context.getString(R.string.game_tonight, Team.TEAM_NAME)
                 : context.getString(R.string.game_next, Team.TEAM_NAME));
-        label.setGravity(Gravity.END);
+        label.setGravity(Gravity.RIGHT);
         game.addView(label, margins(0, 0));
 
         TextView match = text(22, INK, heading);
-        match.setGravity(Gravity.END);
+        match.setGravity(Gravity.RIGHT);
         match.setMaxLines(2);
         android.text.SpannableStringBuilder line = new android.text.SpannableStringBuilder();
         line.append(g.home ? "vs " : "at ");
@@ -671,7 +744,7 @@ final class Scene {
                 : start.format(DateTimeFormatter.ofPattern("EEEE", Locale.getDefault())) + " " + time;
         // "10:00 PM · Prime Video": the time in grey, where to watch in sand, on one line.
         TextView whenLine = text(15, MUTED, sans);
-        whenLine.setGravity(Gravity.END);
+        whenLine.setGravity(Gravity.RIGHT);
         whenLine.setFontFeatureSettings("tnum");
         android.text.SpannableStringBuilder w = new android.text.SpannableStringBuilder(when + "  ·  ");
         int from = w.length();
@@ -694,8 +767,9 @@ final class Scene {
         time.setFontFeatureSettings("tnum");
         time.setText(state == NOW ? context.getString(R.string.event_now) : item.detail);
         row.addView(time, new LinearLayout.LayoutParams(dp(104), ViewGroup.LayoutParams.WRAP_CONTENT));
-        TextView title = text(22, INK, body);
-        title.setMaxLines(2);
+        TextView title = text(20, INK, body);
+        title.setMaxLines(3);
+        title.setEllipsize(null);
         title.setText(item.text);
         row.addView(title, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         return row;
@@ -727,12 +801,14 @@ final class Scene {
             if (running) handler.post(relayout);
             return;
         }
-        int used = 0;
-        for (int i = 0; i < 2; i++) used += todos.getChildAt(i).getHeight();
-        int avail = todos.getHeight() - used - dp(8);
+        // Below the label and its rule, margins included (the rule's gap had been left out, clipping the last task).
+        View rule = todos.getChildAt(1);
+        int used = rule.getBottom() + ((LinearLayout.LayoutParams) rule.getLayoutParams()).bottomMargin;
+        int avail = todos.getHeight() - used - dp(8) - dp(6);   // a little to spare: never clip the last line
         int width = todos.getWidth();
 
-        int[][] layouts = {{1, 30, 18}, {1, 26, 14}, {1, 22, 10}, {2, 22, 12}, {2, 19, 8}};   // columns, sp, gap dp
+        // One column only, at full width, so a task is never squeezed: smaller type first, then pages.
+        int[][] layouts = {{1, 30, 18}, {1, 26, 14}, {1, 23, 11}, {1, 20, 9}, {1, 18, 7}, {1, 16, 5}};   // columns, sp, gap dp
         int[] chosen = layouts[layouts.length - 1];
         int perPage = 0;
         for (int[] l : layouts) {
@@ -794,7 +870,9 @@ final class Scene {
         num.setText(String.format(Locale.US, "%02d", number));
         row.addView(num, new LinearLayout.LayoutParams(dp(Math.round(sp * 1.6f)), ViewGroup.LayoutParams.WRAP_CONTENT));
         TextView label = text(sp, INK, body);
-        label.setMaxLines(3);
+        // Wrapped, never cut: as many lines as the task takes.
+        label.setMaxLines(Integer.MAX_VALUE);
+        label.setEllipsize(null);
         label.setLineSpacing(0, 1.08f);
         label.setText(item.text);
         row.addView(label, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
@@ -839,6 +917,11 @@ final class Scene {
         return text + " ";
     }
 
+    /*
+     * Text on the right sits flush with the right edge whatever its language: Gravity.END means the end of the
+     * text's own direction, the left edge for an Arabic song title, so the right column uses Gravity.RIGHT.
+     */
+
     /** Small grey capitals, widely spaced: every label on this screen. */
     private TextView label(String text) {
         TextView t = text(13, MUTED, sansMedium);
@@ -864,8 +947,11 @@ final class Scene {
         t.setTextSize(TypedValue.COMPLEX_UNIT_SP, sp);
         t.setTextColor(color);
         t.setTypeface(face);
-        t.setEllipsize(TextUtils.TruncateAt.END);
-        t.setMaxLines(1);
+        // Never an ellipsis anywhere: text that runs long takes a second line instead.
+        t.setEllipsize(null);
+        t.setMaxLines(2);
+        // A soft dark halo, so type stays readable over a bright picture.
+        t.setShadowLayer(dp(10), 0, 0, 0xB3000000);
         return t;
     }
 
