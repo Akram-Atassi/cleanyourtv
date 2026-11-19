@@ -104,11 +104,11 @@ final class Scene {
         plp.setMargins(dp(64), dp(48), dp(64), dp(40));
         stage.addView(page, plp);
 
-        // Left: greeting, birthdays, countdowns, the game, and an error line at the bottom when there is one.
+        // Right: greeting, birthdays, countdowns, the game, and an error line at the bottom when there is one.
         LinearLayout left = new LinearLayout(context);
         left.setOrientation(LinearLayout.VERTICAL);
         LinearLayout.LayoutParams llp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 0.36f);
-        llp.setMarginEnd(dp(40));
+        llp.setMarginStart(dp(40));
         page.addView(left, llp);
 
         // Arabic reads right to left, so it starts at the right edge of the column.
@@ -138,10 +138,10 @@ final class Scene {
         status.setVisibility(View.GONE);
         left.addView(status, margins(0, 0));
 
-        // Right: today's events at full width, then the to-do list, the reason for this screen.
+        // Left, before the column above: today's events, then the to-do list, the reason for this screen.
         LinearLayout right = new LinearLayout(context);
         right.setOrientation(LinearLayout.VERTICAL);
-        page.addView(right, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 0.64f));
+        page.addView(right, 0, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 0.64f));
         events = panel(right, R.string.today_heading, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT), 0);
         todos = panel(right, R.string.todo_heading, new LinearLayout.LayoutParams(
@@ -354,7 +354,7 @@ final class Scene {
             return;
         }
         int avail = todos.getHeight() - todos.getPaddingTop() - todos.getPaddingBottom() - title.getHeight()
-                - (done > 0 ? dp(40) : 0);
+                - (done > 0 ? dp(28) : 0);
         int width = todos.getWidth() - todos.getPaddingLeft() - todos.getPaddingRight();
 
         // The first layout that holds every task, measured with the tasks wrapped as they really wrap: one column
