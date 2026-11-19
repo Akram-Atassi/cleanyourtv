@@ -55,4 +55,13 @@ public class ListsTest {
         assertEquals("two lines", Lists.todos(Csv.parse("\"two\nlines\",\n")).get(0).text);
         assertTrue(item.text.length() <= 120);
     }
+
+    @Test
+    public void eventTimes() {
+        assertEquals(java.time.LocalTime.of(15, 0), Lists.time("3:00 PM"));
+        assertEquals(java.time.LocalTime.of(23, 59), Lists.time("11:59 pm"));
+        assertEquals(java.time.LocalTime.of(9, 5), Lists.time("09:05"));
+        assertEquals(null, Lists.time("All day"));
+        assertEquals(null, Lists.time(""));
+    }
 }

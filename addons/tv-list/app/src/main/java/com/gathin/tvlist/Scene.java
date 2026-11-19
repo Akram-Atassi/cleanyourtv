@@ -2,6 +2,7 @@ package com.gathin.tvlist;
 
 import android.content.Context;
 import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
@@ -50,6 +51,7 @@ final class Scene {
     static final int RULE = 0xFF2C2A27;
     static final int SAND = 0xFFD9BE8F;
     static final int RED = 0xFFE5484D;
+    private static final int PAST = 0, NEXT = 1, UPCOMING = 2;
     private static final long RETRY_MS = 60_000L;
     private static final long PAGE_MS = 12_000L;
     private static final int SHIFT_DP = 6;
@@ -61,12 +63,21 @@ final class Scene {
     private final Context context;
     private final File dir;
     private final Handler handler = new Handler(Looper.getMainLooper());
-    private final Typeface serif = Typeface.create("serif", Typeface.NORMAL);
+    /** The system serif: only for the Arabic greeting, which it sets in Noto Naskh. */
+    private final Typeface naskh = Typeface.create("serif", Typeface.NORMAL);
+    // Fraunces (assets/fonts, SIL Open Font License) at settings for each job: soft and light for the big numerals,
+    // a book weight at text size for tasks, the italic for captions and numbers.
+    private final Typeface display;
+    private final Typeface displayItalic;
+    private final Typeface body;
+    private final Typeface bodyItalic;
+    private final Typeface heading;
     private final Typeface sansLight = sans(300);
     private final Typeface sans = sans(400);
     private final Typeface sansMedium = sans(500);
     private final FrameLayout stage;
     private final TextView greeting;
+    private final SkyMark sky;
     private final TextView birthdays;
     private final LinearLayout countdowns;
     private final LinearLayout game;
@@ -91,9 +102,21 @@ final class Scene {
     Scene(Context context) {
         this.context = context;
         this.dir = context.getFilesDir();
+        display = fraunces(context, false, 300, 144, 100, 1);
+        displayItalic = fraunces(context, true, 300, 144, 100, 1);
+        body = fraunces(context, false, 400, 36, 50, 0);
+        bodyItalic = fraunces(context, true, 400, 24, 50, 1);
+        heading = fraunces(context, false, 500, 72, 30, 1);
 
         root = new FrameLayout(context);
-        root.setBackgroundColor(PAPER);
+        // A faint vignette: a touch lighter in the middle, darker at the edges. Depth without a glow.
+        GradientDrawable paper = new GradientDrawable();
+        paper.setGradientType(GradientDrawable.RADIAL_GRADIENT);
+        paper.setColors(new int[]{0xFF191715, PAPER, 0xFF0B0A09});
+        paper.setGradientRadius(context.getResources().getDisplayMetrics().widthPixels * 0.75f);
+        // Over it a fine grain, so the black reads as printed rather than flat.
+        root.setBackground(new android.graphics.drawable.LayerDrawable(new android.graphics.drawable.Drawable[]{
+                paper, grain(context)}));
         root.setKeepScreenOn(true);
         stage = new FrameLayout(context);
         root.addView(stage, new FrameLayout.LayoutParams(
@@ -109,7 +132,7 @@ final class Scene {
         // Left: today's events, then the to-do list, the reason for this screen.
         LinearLayout left = new LinearLayout(context);
         left.setOrientation(LinearLayout.VERTICAL);
-        page.addView(left, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 0.62f));
+        page.addView(left, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 0.60f));
         events = section(left, R.string.today_heading, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT), 0);
         todos = section(left, R.string.todo_heading, new LinearLayout.LayoutParams(
@@ -119,33 +142,49 @@ final class Scene {
         LinearLayout right = new LinearLayout(context);
         right.setOrientation(LinearLayout.VERTICAL);
         right.setGravity(Gravity.END);
-        LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 0.38f);
-        rlp.setMarginStart(dp(72));
+        LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 0.40f);
+        rlp.setMarginStart(dp(56));
         page.addView(right, rlp);
+        // The moon's glow spills past the column and the page margin instead of stopping at a hard edge.
+        right.setClipChildren(false);
+        page.setClipChildren(false);
+        stage.setClipChildren(false);
+        right.setClipToPadding(false);
 
-        // Arabic reads right to left, so it starts at the right edge.
-        greeting = text(52, INK, serif);
+        // Tonight's moon (or the morning sun) in its glow, then the greeting; Arabic ends at the right edge.
+        // Layered, not side by side: the greeting has the column's whole width, flush right, and the moon sits at
+        // the column's left in the same band, its glow behind.
+        FrameLayout top = new FrameLayout(context);
+        top.setClipChildren(false);
+        sky = new SkyMark(context);
+        top.addView(sky, new FrameLayout.LayoutParams(dp(100), dp(100), Gravity.START | Gravity.CENTER_VERTICAL));
+        greeting = text(48, INK, naskh);
         greeting.setTextDirection(View.TEXT_DIRECTION_RTL);
-        greeting.setTextAlignment(View.TEXT_ALIGNMENT_TEXT_START);
         greeting.setIncludeFontPadding(false);
-        right.addView(greeting, margins(0, 0));
+        greeting.setEllipsize(null);   // never cut the greeting short
+        top.addView(greeting, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.END | Gravity.CENTER_VERTICAL));
+        LinearLayout.LayoutParams tp = margins(-dp(30), 0);   // the glow may reach into the margin above
+        right.addView(top, tp);
 
         // Today's birthdays, in red, right under the greeting; gone on other days.
-        birthdays = text(20, RED, sansMedium);
+        birthdays = text(26, RED, bodyItalic);
         birthdays.setMaxLines(3);
         birthdays.setGravity(Gravity.END);
         birthdays.setVisibility(View.GONE);
         right.addView(birthdays, margins(dp(12), 0));
 
+        // The column uses its whole height: greeting at the top, countdowns in the middle, the game at the bottom,
+        // level with the foot of the list.
+        right.addView(new View(context), new LinearLayout.LayoutParams(0, 0, 1f));
         countdowns = new LinearLayout(context);
         countdowns.setOrientation(LinearLayout.VERTICAL);
-        right.addView(countdowns, margins(dp(40), 0));
+        right.addView(countdowns, margins(0, 0));
+        right.addView(new View(context), new LinearLayout.LayoutParams(0, 0, 1f));
 
         game = new LinearLayout(context);
         game.setOrientation(LinearLayout.VERTICAL);
-        right.addView(game, margins(dp(40), 0));
-
-        right.addView(new View(context), new LinearLayout.LayoutParams(0, 0, 1f));
+        right.addView(game, margins(dp(36), 0));
         status = text(14, RED, sans);
         status.setMaxLines(3);
         status.setGravity(Gravity.END);
@@ -230,7 +269,9 @@ final class Scene {
     private void tick() {
         handler.removeCallbacks(tick);
         if (!running) return;
-        greeting.setText(greeting(Calendar.getInstance().get(Calendar.HOUR_OF_DAY)));
+        int hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
+        greeting.setText(greeting(hour));
+        sky.set(greeting(hour) == R.string.greeting_morning, System.currentTimeMillis());
         showCountdowns();
         showGame();
         handler.postDelayed(tick, 60_000L);
@@ -256,7 +297,19 @@ final class Scene {
         events.setVisibility(anyEvents ? View.VISIBLE : View.GONE);
         ((LinearLayout.LayoutParams) todos.getLayoutParams()).topMargin = anyEvents ? dp(40) : 0;
         clear(events);
-        for (Lists.Item item : today) events.addView(eventRow(item), margins(dp(14), 0));
+        java.time.LocalTime now = java.time.LocalTime.now();
+        boolean nextFound = false;
+        for (Lists.Item item : today) {
+            java.time.LocalTime at = Lists.time(item.detail);
+            int state = UPCOMING;
+            if (at != null && at.isBefore(now.minusMinutes(30))) {
+                state = PAST;
+            } else if (at != null && !nextFound) {
+                state = NEXT;
+                nextFound = true;
+            }
+            events.addView(eventRow(item, state), margins(dp(14), 0));
+        }
         fillTodos();
         showCountdowns();
         showGame();
@@ -270,16 +323,16 @@ final class Scene {
         for (Lists.Countdown c : Lists.countdowns(
                 Csv.parse(Config.read(new File(dir, Sheet.COUNTDOWN_CACHE))), today)) {
             long days = c.daysFrom(today);
-            TextView number = text(days <= 1 ? 40 : 64, INK, serif);
+            TextView number = text(days <= 1 ? 44 : 88, INK, days <= 1 ? displayItalic : display);
             number.setGravity(Gravity.END);
             number.setIncludeFontPadding(false);
             number.setText(days == 0 ? context.getString(R.string.countdown_today_word)
                     : days == 1 ? context.getString(R.string.countdown_tomorrow_word) : String.valueOf(days));
             countdowns.addView(number, margins(first ? 0 : dp(24), 0));
-            TextView caption = text(17, MUTED, sans);
+            TextView caption = text(20, MUTED, bodyItalic);
             caption.setGravity(Gravity.END);
             caption.setText(days <= 1 ? c.name : context.getString(R.string.countdown_until, c.name));
-            countdowns.addView(caption, margins(dp(4), 0));
+            countdowns.addView(caption, margins(dp(2), 0));
             first = false;
         }
     }
@@ -296,15 +349,31 @@ final class Scene {
         boolean onNow = !Instant.now().isBefore(g.start);
         String time = android.text.format.DateFormat.getTimeFormat(context).format(Date.from(g.start));
 
+        // The team's colours, a thin purple and gold stripe over the label.
+        LinearLayout stripe = new LinearLayout(context);
+        stripe.setOrientation(LinearLayout.HORIZONTAL);
+        stripe.setGravity(Gravity.END);
+        for (int colour : Team.COLOURS) {
+            View bar = new View(context);
+            bar.setBackgroundColor(colour);
+            stripe.addView(bar, new LinearLayout.LayoutParams(dp(28), dp(3)));
+        }
+        game.addView(stripe, margins(0, dp(14)));
+
         TextView label = label(tonight ? context.getString(R.string.game_tonight, Team.TEAM_NAME)
                 : context.getString(R.string.game_next, Team.TEAM_NAME));
         label.setGravity(Gravity.END);
         game.addView(label, margins(0, 0));
 
-        TextView match = text(32, INK, serif);
+        TextView match = text(36, INK, heading);
         match.setGravity(Gravity.END);
         match.setMaxLines(2);
-        match.setText((g.home ? "vs " : "at ") + g.opponent);
+        android.text.SpannableStringBuilder line = new android.text.SpannableStringBuilder();
+        line.append(g.home ? "vs " : "at ");
+        line.setSpan(new TypefaceSpanCompat(bodyItalic), 0, line.length(), 0);
+        line.setSpan(new android.text.style.ForegroundColorSpan(MUTED), 0, line.length(), 0);
+        line.append(g.opponent);
+        match.setText(line);
         game.addView(match, margins(dp(10), 0));
 
         String when = onNow ? context.getString(R.string.game_on_now)
@@ -323,16 +392,20 @@ final class Scene {
         game.addView(watch, margins(dp(2), 0));
     }
 
-    /** "3:00 PM   ECON office hours": the time in grey, even digits; the event in serif. */
-    private View eventRow(Lists.Item item) {
+    /**
+     * "3:00 PM   Coffee with Sam": the time in grey with even digits, the event in Fraunces. A timeline: what has
+     * passed fades, and the next event's time is in sand.
+     */
+    private View eventRow(Lists.Item item, int state) {
         LinearLayout row = new LinearLayout(context);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setBaselineAligned(true);
-        TextView time = text(17, MUTED, sans);
+        TextView time = text(17, state == NEXT ? SAND : state == PAST ? FAINT : MUTED,
+                state == NEXT ? sansMedium : sans);
         time.setFontFeatureSettings("tnum");
         time.setText(item.detail);
         row.addView(time, new LinearLayout.LayoutParams(dp(104), ViewGroup.LayoutParams.WRAP_CONTENT));
-        TextView title = text(24, INK, serif);
+        TextView title = text(26, state == PAST ? FAINT : INK, body);
         title.setMaxLines(2);
         title.setText(item.text);
         row.addView(title, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
@@ -357,8 +430,7 @@ final class Scene {
         title.setText(R.string.todo_heading);
         todoPages = 1;
         if (open.isEmpty()) {
-            TextView none = text(28, MUTED, serif);
-            none.setTypeface(Typeface.create(serif, Typeface.ITALIC));
+            TextView none = text(34, MUTED, displayItalic);
             none.setText(R.string.no_todos);
             todos.addView(none, margins(dp(20), 0));
             footer(done);
@@ -432,11 +504,11 @@ final class Scene {
         LinearLayout row = new LinearLayout(context);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setBaselineAligned(true);
-        TextView num = text(Math.round(sp * 0.6f), FAINT, sansLight);
+        TextView num = text(Math.round(sp * 0.7f), FAINT, bodyItalic);
         num.setFontFeatureSettings("tnum");
         num.setText(String.format(Locale.US, "%02d", number));
         row.addView(num, new LinearLayout.LayoutParams(dp(Math.round(sp * 1.6f)), ViewGroup.LayoutParams.WRAP_CONTENT));
-        TextView label = text(sp, INK, serif);
+        TextView label = text(sp, INK, body);
         label.setMaxLines(3);
         label.setLineSpacing(0, 1.08f);
         label.setText(item.text);
@@ -511,6 +583,58 @@ final class Scene {
         t.setEllipsize(TextUtils.TruncateAt.END);
         t.setMaxLines(1);
         return t;
+    }
+
+    /** A tile of fine film grain: specks of light and dark at a few percent, repeated across the screen. */
+    private static android.graphics.drawable.Drawable grain(Context context) {
+        int size = 160;
+        android.graphics.Bitmap tile = android.graphics.Bitmap.createBitmap(size, size,
+                android.graphics.Bitmap.Config.ARGB_8888);
+        java.util.Random random = new java.util.Random(7);
+        int[] px = new int[size * size];
+        for (int i = 0; i < px.length; i++) {
+            int a = random.nextInt(14);
+            px[i] = random.nextBoolean() ? (a << 24) | 0xFFFFFF : (a << 24);
+        }
+        tile.setPixels(px, 0, size, 0, 0, size, size);
+        android.graphics.drawable.BitmapDrawable d =
+                new android.graphics.drawable.BitmapDrawable(context.getResources(), tile);
+        d.setTileModeXY(android.graphics.Shader.TileMode.REPEAT, android.graphics.Shader.TileMode.REPEAT);
+        return d;
+    }
+
+    /** Fraunces from the app's assets at the given weight, optical size, softness and wonk; the system serif if not. */
+    private static Typeface fraunces(Context context, boolean italic, int wght, int opsz, int soft, int wonk) {
+        try {
+            Typeface face = new Typeface.Builder(context.getAssets(),
+                    italic ? "fonts/fraunces_italic.ttf" : "fonts/fraunces.ttf")
+                    .setFontVariationSettings("'wght' " + wght + ", 'opsz' " + opsz + ", 'SOFT' " + soft
+                            + ", 'WONK' " + wonk)
+                    .build();
+            if (face != null) return face;
+        } catch (RuntimeException e) {
+            Log.w("TvList", "fraunces: " + e);
+        }
+        return Typeface.create("serif", italic ? Typeface.ITALIC : Typeface.NORMAL);
+    }
+
+    /** A span that sets a whole Typeface; android.text.style.TypefaceSpan takes one only from Android 9. */
+    private static final class TypefaceSpanCompat extends android.text.style.MetricAffectingSpan {
+        private final Typeface face;
+
+        TypefaceSpanCompat(Typeface face) {
+            this.face = face;
+        }
+
+        @Override
+        public void updateDrawState(android.text.TextPaint paint) {
+            paint.setTypeface(face);
+        }
+
+        @Override
+        public void updateMeasureState(android.text.TextPaint paint) {
+            paint.setTypeface(face);
+        }
     }
 
     /** Roboto at a weight; Android 9 and later take any weight, older ones the nearest named style. */

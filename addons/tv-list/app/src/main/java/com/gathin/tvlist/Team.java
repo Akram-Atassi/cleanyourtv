@@ -20,6 +20,8 @@ import java.util.List;
 final class Team {
     static final String TEAM = "lal";
     static final String TEAM_NAME = "Lakers";
+    /** The team's colours, purple and gold, for the stripe over its game. */
+    static final int[] COLOURS = {0xFF552583, 0xFFFDB927};
     static final String CACHE = "team.json";
     static final long REFRESH_MS = 30 * 60_000L;
     /** A game that started up to this long ago still counts as tonight's (it is on now). */

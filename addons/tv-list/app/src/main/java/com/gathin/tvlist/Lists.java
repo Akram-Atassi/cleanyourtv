@@ -111,6 +111,19 @@ final class Lists {
         return null;
     }
 
+    /** An event's time as calendar.gs writes it ("3:00 PM", or "15:00"); null for "All day" and anything else. */
+    static java.time.LocalTime time(String text) {
+        String t = text.trim().toUpperCase(Locale.ROOT);
+        for (String pattern : new String[]{"h:mm a", "H:mm"}) {
+            try {
+                return java.time.LocalTime.parse(t, java.time.format.DateTimeFormatter.ofPattern(pattern, Locale.US));
+            } catch (java.time.format.DateTimeParseException ignored) {
+                // try the next
+            }
+        }
+        return null;
+    }
+
     /** calendar.gs writes a birthday into the Today tab with "Birthday" as its time. */
     static boolean isBirthday(Item item) {
         return "birthday".equalsIgnoreCase(item.detail.trim());

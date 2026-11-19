@@ -105,6 +105,14 @@ TV_HOST=192.168.1.50 addons/tv-list/build-and-install.sh --uninstall
 
 `adb logcat -s TvList` says why a refresh failed.
 
+## Look
+
+Set like a printed page: a warm near-black field with a faint vignette and film grain, tasks and events in
+[Fraunces](https://github.com/undercasetype/Fraunces) (bundled in `app/src/main/assets/fonts`, SIL Open Font License,
+`OFL-Fraunces.txt` beside it), labels in Roboto, the greeting in Noto Naskh Arabic. Beside the greeting, tonight's
+moon in its real phase (computed on the TV), or the sun in the morning. Today is a timeline: past events fade and the
+next one's time is in sand. The Lakers' block carries a purple and gold stripe.
+
 ## Permissions
 
 | Permission | Why |
