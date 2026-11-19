@@ -202,6 +202,7 @@ final class Scene {
                 ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.END | Gravity.CENTER_VERTICAL));
         right.addView(timeBand, margins(dp(4), 0));
         date = text(18, MUTED, bodyItalic);
+        italicRoom(date);
         date.setGravity(Gravity.END);
         right.addView(date, margins(dp(2), 0));
 
@@ -238,6 +239,7 @@ final class Scene {
         historyHead.addView(label(context.getString(R.string.history_heading)), new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         historyYear = text(24, SAND, displayItalic);
+        italicRoom(historyYear);
         LinearLayout.LayoutParams yp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         yp.setMarginStart(dp(14));
@@ -265,6 +267,7 @@ final class Scene {
         mediaTitle.setGravity(Gravity.END);
         mediaText.addView(mediaTitle, margins(dp(6), 0));
         mediaArtist = text(15, MUTED, bodyItalic);
+        italicRoom(mediaArtist);
         mediaArtist.setGravity(Gravity.END);
         mediaText.addView(mediaArtist, margins(dp(2), 0));
         mediaArt = new android.widget.ImageView(context);
@@ -617,6 +620,7 @@ final class Scene {
                 line.addView(number, np);
             }
             TextView caption = text(16, MUTED, bodyItalic);
+            italicRoom(caption);
             caption.setText(days == 0 ? context.getString(R.string.countdown_today, c.name)
                     : days == 1 ? context.getString(R.string.countdown_tomorrow, c.name)
                     : context.getString(R.string.countdown_until, c.name));
@@ -842,6 +846,14 @@ final class Scene {
     /** Removes a section's content, keeping its label and rule. */
     private static void clear(LinearLayout section) {
         if (section.getChildCount() > 2) section.removeViews(2, section.getChildCount() - 2);
+    }
+
+    /**
+     * An italic leans past the right edge of its own box, so set flush right its last letter is clipped: give it a
+     * little room there.
+     */
+    private void italicRoom(TextView t) {
+        t.setPadding(t.getPaddingLeft(), t.getPaddingTop(), dp(5), t.getPaddingBottom());
     }
 
     /** Small grey capitals, widely spaced: every label on this screen. */
