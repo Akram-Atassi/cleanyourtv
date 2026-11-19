@@ -107,6 +107,9 @@ TV_HOST=192.168.1.50 addons/tv-list/build-and-install.sh --uninstall
 
 ## Look
 
+Top right: the greeting with tonight's moon, then the time in Arabic numerals (٩:١٥ م) and the date. At the foot of the right column, Now playing (song, artist, album art) while music plays on the TV, and On this day otherwise.
+
+
 Set like a printed page: a warm near-black field with a faint vignette and film grain, tasks and events in
 [Fraunces](https://github.com/undercasetype/Fraunces) (bundled in `app/src/main/assets/fonts`, SIL Open Font License,
 `OFL-Fraunces.txt` beside it), labels in Roboto, the greeting in Noto Naskh Arabic. Beside the greeting, tonight's
@@ -117,7 +120,8 @@ next one's time is in sand. The Lakers' block carries a purple and gold stripe.
 
 | Permission | Why |
 |---|---|
-| `INTERNET` | To read the two tabs of your sheet from `docs.google.com`, over HTTPS, while the screensaver or the card is on screen. |
+| `INTERNET` | To read your sheet from `docs.google.com`, the Lakers' schedule from ESPN and On this day from Wikipedia, over HTTPS, while the list is on screen. |
+| Notification access (`MediaListener`) | Only to see what is playing on the TV (Spotify and the like) for Now playing. `setup.sh` allows it with `cmd notification allow_listener`; no notification is ever read, and without it the list simply shows no Now playing. |
 
 That is all. What goes out is a plain GET for each tab, with the user agent `cleanyourtv-tvlist/1.0`; Google sees the
 TV's IP address, as with any visit. No account, no telemetry, no ads, no background service, no location. The sheet

@@ -44,6 +44,18 @@
             <meta-data android:name="com.gathin.tvhome.card" android:resource="@xml/module_card" />
         </activity>
 
+        <!-- Lets the list read what is playing (the media sessions), once allowed with
+             `cmd notification allow_listener com.gathin.tvlist/com.gathin.tvlist.MediaListener`. Reads no notifications. -->
+        <service
+            android:name=".MediaListener"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
         <!-- setup.sh writes sheet.txt through this. WRITE_SECURE_SETTINGS: the adb shell has it, ordinary apps don't. -->
         <provider
             android:name=".FilesProvider"

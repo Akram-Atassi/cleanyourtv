@@ -42,6 +42,8 @@ if [ -n "$ARG" ]; then
   echo "sheet: $ID"
 fi
 
+# Now playing: Android shows the media sessions only to an allowed notification listener (no notifications are read).
+tv "cmd notification allow_listener /.MediaListener" >/dev/null || echo "note: could not allow now playing; the list works without it" >&2
 tv "[ -f $BEFORE ] || { settings get secure screensaver_components; settings get secure screensaver_enabled; } > $BEFORE; settings put secure screensaver_components $DREAM; settings put secure screensaver_enabled 1" >/dev/null
 [ "$IDLE_MINUTES" -eq 0 ] || tv "settings put system screen_off_timeout $((IDLE_MINUTES * 60000))" >/dev/null
 echo "On the TV now:"

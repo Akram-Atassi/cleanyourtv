@@ -78,6 +78,15 @@ final class Scene {
     private final FrameLayout stage;
     private final TextView greeting;
     private final SkyMark sky;
+    private final TextView clock;
+    private final TextView date;
+    private final LinearLayout mediaBox;
+    private final TextView mediaTitle;
+    private final TextView mediaArtist;
+    private final android.widget.ImageView mediaArt;
+    private android.media.session.MediaSessionManager sessions;
+    private android.media.session.MediaController playing;
+    private boolean mediaShowing;
     private final TextView birthdays;
     private final LinearLayout countdowns;
     private final LinearLayout game;
@@ -104,6 +113,7 @@ final class Scene {
     private final Runnable tick = this::tick;
     private final Runnable nextPage = () -> page(1);
     private final Runnable relayout = this::fillTodos;
+    private final Runnable clockTick = this::clockTick;
     private final Runnable nextHistory = () -> showHistoryEvent(true);
     private static final long HISTORY_MS = 20_000L;
     private static final int HISTORY_LINES = 3;
@@ -170,8 +180,8 @@ final class Scene {
         FrameLayout top = new FrameLayout(context);
         top.setClipChildren(false);
         sky = new SkyMark(context);
-        top.addView(sky, new FrameLayout.LayoutParams(dp(100), dp(100), Gravity.START | Gravity.CENTER_VERTICAL));
-        greeting = text(48, INK, naskh);
+        top.addView(sky, new FrameLayout.LayoutParams(dp(92), dp(92), Gravity.START | Gravity.CENTER_VERTICAL));
+        greeting = text(42, INK, naskh);
         greeting.setTextDirection(View.TEXT_DIRECTION_RTL);
         greeting.setIncludeFontPadding(false);
         greeting.setEllipsize(null);   // never cut the greeting short
@@ -180,31 +190,44 @@ final class Scene {
         LinearLayout.LayoutParams tp = margins(-dp(30), 0);   // the glow may reach into the margin above
         right.addView(top, tp);
 
-        // Today's birthdays, in red, right under the greeting; gone on other days.
-        birthdays = text(26, RED, bodyItalic);
+        // The time in Arabic numerals, with ص or م, and the date under it in italic.
+        clock = text(46, INK, naskh);
+        clock.setTextDirection(View.TEXT_DIRECTION_RTL);
+        // Right edge whatever the text's direction (END would mean left for Arabic).
+        clock.setGravity(Gravity.RIGHT);
+        clock.setTextAlignment(View.TEXT_ALIGNMENT_GRAVITY);
+        clock.setIncludeFontPadding(false);
+        clock.setEllipsize(null);
+        right.addView(clock, margins(dp(2), 0));
+        date = text(18, MUTED, bodyItalic);
+        date.setGravity(Gravity.END);
+        right.addView(date, margins(dp(2), 0));
+
+        // Today's birthdays, in red, right under the date; gone on other days.
+        birthdays = text(20, RED, bodyItalic);
         birthdays.setMaxLines(3);
         birthdays.setGravity(Gravity.END);
         birthdays.setVisibility(View.GONE);
-        right.addView(birthdays, margins(dp(12), 0));
+        right.addView(birthdays, margins(dp(8), 0));
 
         // The column uses its whole height: greeting at the top, countdowns in the middle, the game at the bottom,
         // level with the foot of the list.
         right.addView(new View(context), new LinearLayout.LayoutParams(0, 0, 1f));
         countdowns = new LinearLayout(context);
         countdowns.setOrientation(LinearLayout.VERTICAL);
-        right.addView(countdowns, margins(0, 0));
+        right.addView(countdowns, margins(dp(18), 0));
         right.addView(new View(context), new LinearLayout.LayoutParams(0, 0, 1f));
 
         game = new LinearLayout(context);
         game.setOrientation(LinearLayout.VERTICAL);
-        right.addView(game, margins(dp(24), 0));
+        right.addView(game, margins(dp(18), 0));
 
         // At the foot: on this day in history, one event at a time, crossfading.
         historyBox = new LinearLayout(context);
         historyBox.setOrientation(LinearLayout.VERTICAL);
         historyBox.setGravity(Gravity.END);
         historyBox.setVisibility(View.GONE);
-        right.addView(historyBox, margins(dp(24), 0));
+        right.addView(historyBox, margins(dp(18), 0));
         LinearLayout historyHead = new LinearLayout(context);
         historyHead.setOrientation(LinearLayout.HORIZONTAL);
         historyHead.setGravity(Gravity.END | Gravity.BOTTOM);
@@ -212,17 +235,49 @@ final class Scene {
         historyBox.addView(historyHead, margins(0, 0));
         historyHead.addView(label(context.getString(R.string.history_heading)), new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        historyYear = text(28, SAND, displayItalic);
+        historyYear = text(24, SAND, displayItalic);
         LinearLayout.LayoutParams yp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         yp.setMarginStart(dp(14));
         historyHead.addView(historyYear, yp);
-        historyText = text(18, 0xFFC9C3B8, body);
+        historyText = text(16, 0xFFC9C3B8, body);
         historyText.setMaxLines(HISTORY_LINES);
         historyText.setEllipsize(null);
         historyText.setGravity(Gravity.END);
         historyText.setLineSpacing(0, 1.1f);
         historyBox.addView(historyText, margins(dp(4), 0));
+        // Now playing, in the history's place while music plays: song and artist, the album art at the edge.
+        mediaBox = new LinearLayout(context);
+        mediaBox.setOrientation(LinearLayout.HORIZONTAL);
+        mediaBox.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+        mediaBox.setVisibility(View.GONE);
+        right.addView(mediaBox, margins(dp(18), 0));
+        LinearLayout mediaText = new LinearLayout(context);
+        mediaText.setOrientation(LinearLayout.VERTICAL);
+        mediaText.setGravity(Gravity.END);
+        mediaBox.addView(mediaText, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        TextView mediaLabel = label(context.getString(R.string.now_playing));
+        mediaLabel.setGravity(Gravity.END);
+        mediaText.addView(mediaLabel, margins(0, 0));
+        mediaTitle = text(20, INK, body);
+        mediaTitle.setGravity(Gravity.END);
+        mediaText.addView(mediaTitle, margins(dp(6), 0));
+        mediaArtist = text(15, MUTED, bodyItalic);
+        mediaArtist.setGravity(Gravity.END);
+        mediaText.addView(mediaArtist, margins(dp(2), 0));
+        mediaArt = new android.widget.ImageView(context);
+        mediaArt.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
+        mediaArt.setOutlineProvider(new android.view.ViewOutlineProvider() {
+            @Override
+            public void getOutline(View view, android.graphics.Outline outline) {
+                outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), dp(6));
+            }
+        });
+        mediaArt.setClipToOutline(true);
+        LinearLayout.LayoutParams ap = new LinearLayout.LayoutParams(dp(68), dp(68));
+        ap.setMarginStart(dp(16));
+        mediaBox.addView(mediaArt, ap);
+
         status = text(14, RED, sans);
         status.setMaxLines(3);
         status.setGravity(Gravity.END);
@@ -245,6 +300,8 @@ final class Scene {
             refresh();
         }
         tick();
+        clockTick();
+        startMedia();
     }
 
     void stop() {
@@ -252,6 +309,7 @@ final class Scene {
         handler.removeCallbacksAndMessages(null);
         stage.animate().cancel();
         historyBox.animate().cancel();
+        stopMedia();
         if (executor != null) executor.shutdownNow();
         executor = null;
     }
@@ -377,6 +435,121 @@ final class Scene {
         todos.requestLayout();
     }
 
+    /** The time as ٩:١٥ م, the date in words; again at the turn of the next minute. */
+    private void clockTick() {
+        handler.removeCallbacks(clockTick);
+        if (!running) return;
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        clock.setText(arabicTime(now.getHour(), now.getMinute()));
+        date.setText(now.format(DateTimeFormatter.ofPattern("EEEE, MMMM d", Locale.getDefault())));
+        long msIntoMinute = now.getSecond() * 1000L + now.getNano() / 1_000_000L;
+        handler.postDelayed(clockTick, 60_000L - msIntoMinute + 50);
+    }
+
+    /** 21:05 as ٩:٠٥ م: a twelve-hour clock in Arabic-Indic digits, ص before noon and م after. */
+    static String arabicTime(int hour, int minute) {
+        int h = hour % 12 == 0 ? 12 : hour % 12;
+        return arabicDigits(h) + ":" + arabicDigits(minute / 10) + arabicDigits(minute % 10) + " "
+                + (hour < 12 ? "ص" : "م");
+    }
+
+    private final android.media.session.MediaSessionManager.OnActiveSessionsChangedListener sessionsChanged =
+            controllers -> pickPlaying();
+
+    private final android.media.session.MediaController.Callback playingChanged =
+            new android.media.session.MediaController.Callback() {
+                @Override
+                public void onPlaybackStateChanged(android.media.session.PlaybackState state) {
+                    pickPlaying();
+                }
+
+                @Override
+                public void onMetadataChanged(android.media.MediaMetadata metadata) {
+                    showMedia();
+                }
+
+                @Override
+                public void onSessionDestroyed() {
+                    pickPlaying();
+                }
+            };
+
+    /**
+     * What is playing on the TV (Spotify, YouTube Music, a cast): Android's active media sessions, which it hands
+     * only to an app whose notification listener the owner allowed. Without that, the box simply never shows.
+     */
+    private void startMedia() {
+        sessions = context.getSystemService(android.media.session.MediaSessionManager.class);
+        if (sessions == null) return;
+        try {
+            sessions.addOnActiveSessionsChangedListener(sessionsChanged, listener(), handler);
+            pickPlaying();
+        } catch (SecurityException e) {
+            Log.i("TvList", "now playing: notification access not allowed");
+            sessions = null;
+        }
+    }
+
+    private void stopMedia() {
+        if (sessions != null) sessions.removeOnActiveSessionsChangedListener(sessionsChanged);
+        if (playing != null) playing.unregisterCallback(playingChanged);
+        playing = null;
+        sessions = null;
+    }
+
+    private android.content.ComponentName listener() {
+        return new android.content.ComponentName(context, MediaListener.class);
+    }
+
+    /** Follows the session that is playing; when none is, the box goes and the history comes back. */
+    private void pickPlaying() {
+        if (sessions == null || !running) return;
+        android.media.session.MediaController found = null;
+        try {
+            for (android.media.session.MediaController c : sessions.getActiveSessions(listener())) {
+                android.media.session.PlaybackState st = c.getPlaybackState();
+                if (st != null && st.getState() == android.media.session.PlaybackState.STATE_PLAYING) {
+                    found = c;
+                    break;
+                }
+            }
+        } catch (SecurityException e) {
+            found = null;
+        }
+        if (playing != null && (found == null || !playing.getSessionToken().equals(found.getSessionToken()))) {
+            playing.unregisterCallback(playingChanged);
+            playing = null;
+        }
+        if (found != null && playing == null) {
+            playing = found;
+            playing.registerCallback(playingChanged, handler);
+        }
+        showMedia();
+    }
+
+    private void showMedia() {
+        android.media.MediaMetadata meta = playing == null ? null : playing.getMetadata();
+        android.media.session.PlaybackState st = playing == null ? null : playing.getPlaybackState();
+        boolean on = meta != null && st != null && st.getState() == android.media.session.PlaybackState.STATE_PLAYING;
+        String title = on ? meta.getString(android.media.MediaMetadata.METADATA_KEY_TITLE) : null;
+        on = on && title != null && !title.isEmpty();
+        mediaShowing = on;
+        mediaBox.setVisibility(on ? View.VISIBLE : View.GONE);
+        historyBox.setVisibility(!on && !history.isEmpty() ? View.VISIBLE : View.GONE);
+        if (!on) return;
+        String artist = meta.getString(android.media.MediaMetadata.METADATA_KEY_ARTIST);
+        if (artist == null || artist.isEmpty()) {
+            artist = meta.getString(android.media.MediaMetadata.METADATA_KEY_DISPLAY_SUBTITLE);
+        }
+        mediaTitle.setText(title);
+        mediaArtist.setText(artist == null ? "" : artist);
+        android.graphics.Bitmap art = meta.getBitmap(android.media.MediaMetadata.METADATA_KEY_ALBUM_ART);
+        if (art == null) art = meta.getBitmap(android.media.MediaMetadata.METADATA_KEY_ART);
+        if (art == null) art = meta.getBitmap(android.media.MediaMetadata.METADATA_KEY_DISPLAY_ICON);
+        mediaArt.setImageBitmap(art);
+        mediaArt.setVisibility(art == null ? View.GONE : View.VISIBLE);
+    }
+
     /** Today's events in history, from the cache; the box hides when there are none (yet). */
     private void showHistory() {
         history = History.load(dir, LocalDate.now());
@@ -393,7 +566,7 @@ final class Scene {
         } else if (running) {
             handler.post(this::showHistory);   // not laid out yet
         }
-        historyBox.setVisibility(history.isEmpty() ? View.GONE : View.VISIBLE);
+        historyBox.setVisibility(history.isEmpty() || mediaShowing ? View.GONE : View.VISIBLE);
         if (history.isEmpty()) return;
         historyIndex = historyIndex % history.size();
         showHistoryEvent(false);
@@ -427,13 +600,13 @@ final class Scene {
                 Csv.parse(Config.read(new File(dir, Sheet.COUNTDOWN_CACHE))), today)) {
             long days = c.daysFrom(today);
             // The count in Arabic numerals, set in Naskh like the greeting above it.
-            TextView number = text(days <= 1 ? 36 : 60, INK, days <= 1 ? displayItalic : naskh);
+            TextView number = text(days <= 1 ? 28 : 44, INK, days <= 1 ? displayItalic : naskh);
             number.setGravity(Gravity.END);
             number.setIncludeFontPadding(false);
             number.setText(days == 0 ? context.getString(R.string.countdown_today_word)
                     : days == 1 ? context.getString(R.string.countdown_tomorrow_word) : arabicDigits(days));
-            countdowns.addView(number, margins(first ? 0 : dp(24), 0));
-            TextView caption = text(18, MUTED, bodyItalic);
+            countdowns.addView(number, margins(first ? 0 : dp(14), 0));
+            TextView caption = text(15, MUTED, bodyItalic);
             caption.setGravity(Gravity.END);
             caption.setText(days <= 1 ? c.name : context.getString(R.string.countdown_until, c.name));
             countdowns.addView(caption, margins(dp(2), 0));
@@ -460,16 +633,16 @@ final class Scene {
         for (int colour : Team.COLOURS) {
             View bar = new View(context);
             bar.setBackgroundColor(colour);
-            stripe.addView(bar, new LinearLayout.LayoutParams(dp(28), dp(3)));
+            stripe.addView(bar, new LinearLayout.LayoutParams(dp(20), dp(3)));
         }
-        game.addView(stripe, margins(0, dp(10)));
+        game.addView(stripe, margins(0, dp(8)));
 
         TextView label = label(tonight ? context.getString(R.string.game_tonight, Team.TEAM_NAME)
                 : context.getString(R.string.game_next, Team.TEAM_NAME));
         label.setGravity(Gravity.END);
         game.addView(label, margins(0, 0));
 
-        TextView match = text(28, INK, heading);
+        TextView match = text(22, INK, heading);
         match.setGravity(Gravity.END);
         match.setMaxLines(2);
         android.text.SpannableStringBuilder line = new android.text.SpannableStringBuilder();
@@ -478,14 +651,14 @@ final class Scene {
         line.setSpan(new android.text.style.ForegroundColorSpan(MUTED), 0, line.length(), 0);
         line.append(g.opponent);
         match.setText(line);
-        game.addView(match, margins(dp(10), 0));
+        game.addView(match, margins(dp(6), 0));
 
         String when = onNow ? context.getString(R.string.game_on_now)
                 : tonight ? time
                 : days == 1 ? context.getString(R.string.game_tomorrow, time)
                 : start.format(DateTimeFormatter.ofPattern("EEEE", Locale.getDefault())) + " " + time;
         // "10:00 PM · Prime Video": the time in grey, where to watch in sand, on one line.
-        TextView whenLine = text(18, MUTED, sans);
+        TextView whenLine = text(15, MUTED, sans);
         whenLine.setGravity(Gravity.END);
         whenLine.setFontFeatureSettings("tnum");
         android.text.SpannableStringBuilder w = new android.text.SpannableStringBuilder(when + "  ·  ");
@@ -494,7 +667,7 @@ final class Scene {
         w.setSpan(new android.text.style.ForegroundColorSpan(SAND), from, w.length(), 0);
         w.setSpan(new TypefaceSpanCompat(sansMedium), from, w.length(), 0);
         whenLine.setText(w);
-        game.addView(whenLine, margins(dp(6), 0));
+        game.addView(whenLine, margins(dp(4), 0));
     }
 
     /**
